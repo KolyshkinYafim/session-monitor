@@ -1,61 +1,68 @@
 # Session Monitor — Architecture
 
+Native **macOS 14+** menu bar app (Swift / SwiftUI + AppKit panel).
+
 ## High level
 
 ```
-┌─────────────────────────────┐
-│ Electron main               │
-│  - tray, notifs             │
-│  - session registry         │
-│  - adapter host             │
-└──────────────┬──────────────┘
-               │ IPC
-┌──────────────▼──────────────┐
-│ Renderer (React)            │
-│  - session list             │
-│  - detail / permission UI   │
-└─────────────────────────────┘
-               ▲
-               │ SessionEvent
-┌──────────────┴──────────────┐
-│ Adapters                    │
-│  grok | claude | codex |    │
-│  opencode | chat-hub bridge │
-└─────────────────────────────┘
+┌──────────────────────────────┐
+│ AppKit host                  │
+│  - NSStatusItem (badge)      │
+│  - NSPanel island (top)      │
+│  - global hotkey             │
+│  - UserNotifications         │
+└──────────────┬───────────────┘
+               │ @Observable store
+┌──────────────▼───────────────┐
+│ SessionStore                 │
+│  apply(SessionEvent)         │
+└──────────────▲───────────────┘
+               │
+     ┌─────────┴──────────┐
+     │                    │
+ MockProducer      ChatHubBridge
+ (timer cycle)     (JSONL tail)
 ```
 
-## SessionEvent (shared contract with Chat Hub)
+## Session model
 
-```ts
-type SessionStatus = "idle" | "running" | "waiting_input" | "error" | "done"
+```swift
+enum SessionStatus { idle, running, waitingInput, error, done }
 
-type SessionEvent =
-  | { type: "session.upsert"; session: SessionMeta }
-  | { type: "session.status"; id: string; status: SessionStatus }
-  | { type: "session.permission"; id: string; requestId: string; summary: string }
-  | { type: "session.question"; id: string; requestId: string; prompt: string; options?: string[] }
-  | { type: "session.message"; id: string; role: "user" | "assistant" | "system"; preview: string }
-  | { type: "session.ended"; id: string; reason: "done" | "error" | "killed" }
+struct SessionMeta {
+  id, title, provider, cwd?, status, updatedAt, createdAt
+}
 ```
 
-Monitor **consumes** events. Chat Hub (and CLIs) **produce** them.
+JSON bridge uses snake_case status `waiting_input` (maps to `waitingInput`).
 
-## How sessions are discovered
+## SessionEvent
 
-MVP options (prefer simple):
+- `session.upsert`
+- `session.status`
+- `session.ended`
+- `session.permission` / `session.question` (status → waiting)
+- `session.message` (touch updatedAt)
 
-1. **Chat Hub bridge** — shared JSONL at  
-   `~/Library/Application Support/agent-desktop/events.jsonl`  
-   (see [bridge.md](./bridge.md))
-2. **Filesystem hooks** — watch known agent log/state dirs
-3. **Process scan** — optional, unreliable; secondary
+Monitor **consumes** events. Chat Hub (and CLIs later) **produce** them.
 
-## Storage
+## Chat Hub bridge path
 
-Local JSON/SQLite: session meta only (id, title, provider, cwd, last status, updatedAt).
+```
+~/Library/Application Support/agent-desktop/events.jsonl
+```
+
+Override: `AGENT_DESKTOP_EVENTS`. Same contract as Chat Hub `docs/bridge.md`.
+
+## UI shell
+
+- `LSUIElement` — no Dock icon, no main window on launch
+- Status item opens a borderless floating `NSPanel` under the menu bar / notch region
+- Hide on Escape, click outside, or resign key
+- Hotkey: **⌘⇧A**
 
 ## Security
 
-- No secrets in renderer
-- Adapters run in main process
-- Explicit allowlist of spawn/watch paths
+- Local filesystem only
+- No secrets in UI
+- Sandbox off for MVP (needs Application Support + optional cwd reveal)

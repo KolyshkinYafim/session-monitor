@@ -10,3 +10,14 @@ out/
 .vscode/
 coverage/
 release/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.SwiftPM/
+

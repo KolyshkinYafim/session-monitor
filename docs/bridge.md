@@ -1,41 +1,24 @@
 # Chat Hub bridge
 
-Session Monitor is a **consumer** of `SessionEvent` produced by Chat Hub (and local adapters).
+Session Monitor **consumes** `SessionEvent` JSONL produced by Chat Hub.
 
-## File path (shared)
-
-On macOS:
+## Path
 
 ```
 ~/Library/Application Support/agent-desktop/events.jsonl
 ```
 
-Override with env `AGENT_DESKTOP_EVENTS` if needed.
+Override with env `AGENT_DESKTOP_EVENTS`.
 
-Same path is documented in Chat Hub `docs/bridge.md` and both READMEs.
+Matches Chat Hub `docs/bridge.md`.
 
 ## Behavior
 
-1. Ensure the JSONL file exists (create empty if missing).
-2. On start: **replay** all lines (notifications suppressed) so existing Hub sessions appear.
-3. Live-tail via `fs.watch` + short poll for new appends.
-4. Forward each valid `session.*` line onto the main `SessionEvent` bus → registry → UI / tray / notifs.
+1. Ensure file exists (create empty if missing).
+2. Replay existing lines on start (`running` / `waiting_input` coerced to `idle` during replay).
+3. Live-tail via FS events + short poll.
+4. Forward validated events into `SessionStore`.
 
-## SessionEvent contract
+## Format
 
-```ts
-type SessionStatus = "idle" | "running" | "waiting_input" | "error" | "done"
-
-type SessionEvent =
-  | { type: "session.upsert"; session: SessionMeta }
-  | { type: "session.status"; id: string; status: SessionStatus }
-  | { type: "session.permission"; id: string; requestId: string; summary: string }
-  | { type: "session.question"; id: string; requestId: string; prompt: string; options?: string[] }
-  | { type: "session.message"; id: string; role: "user" | "assistant" | "system"; preview: string }
-  | { type: "session.ended"; id: string; reason: "done" | "error" | "killed" }
-```
-
-## Standalone
-
-- Without Chat Hub: mock adapter still populates the list; bridge idles on an empty file.
-- Without Monitor: Chat Hub still appends events for later consumption.
+Append-only JSONL, one event per line. See Chat Hub bridge doc for examples.

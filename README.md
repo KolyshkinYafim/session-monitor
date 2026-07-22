@@ -1,91 +1,89 @@
 # Session Monitor
 
-> Ambient control surface for AI coding agent sessions.
+> Ambient menu-bar control surface for AI coding agent sessions (Vibe Island–class).
 
-Electron (macOS first) · TypeScript · React · pnpm
+**Native macOS 14+** · Swift · SwiftUI + AppKit panel  
+Not a chat app. Not a centered document window. Not Electron.
 
 ## What it is
 
-Not another chat shell. This is a **monitor**:
-
-- list of live agent sessions
-- statuses: `idle` | `running` | `waiting_input` | `error` | `done`
-- OS notifications + tray badge (waiting_input count)
-- multi-provider via adapters (mock + Chat Hub bridge; more next)
-
-Spiritually close to Vibe Island / Claude Peek — but tray + compact window first, not a notch-only clone.
-
-## Docs
-
-- [Product](./docs/product.md)
-- [Architecture](./docs/architecture.md)
-- [MVP checklist](./docs/mvp.md)
-
-## Requirements
-
-- macOS (primary), Node ≥ 20, pnpm
-
-## How to run
-
-```bash
-pnpm install
-pnpm dev
-```
-
-Build production bundles (main / preload / renderer → `out/`):
-
-```bash
-pnpm build
-pnpm typecheck
-```
-
-## What works (MVP)
-
-- Electron main + React renderer (electron-vite)
-- Tray icon; click opens main window
-- Session list UI (title, provider, cwd, status, duration)
-- `SessionEvent` bus in main process
-- Mock adapter cycling: `running` → `waiting_input` → `running` → `done` (then restarts)
-- **Chat Hub bridge**: tails shared JSONL and shows Hub sessions
+- Menu bar icon with **waiting_input** badge count
+- Compact **island panel** under the menu bar / top-center (notch region)
+- Hides on **blur**, outside click, or **Escape**
+- Global hotkey **⌘⇧A** to toggle
 - OS notifications on `waiting_input` / `done` / `error`
-- Tray title + dock badge = count of `waiting_input`
-- Session meta persisted to `userData/sessions.json`
+- Sources: **mock sessions** + **Chat Hub JSONL bridge**
 
-## Chat Hub bridge
+## Open & run
 
-Shared append-only event log (same path as Chat Hub):
+```bash
+open SessionMonitor/SessionMonitor.xcodeproj
+```
+
+In Xcode:
+
+1. Select scheme **SessionMonitor**
+2. Destination: **My Mac**
+3. Run (⌘R)
+
+Or from terminal:
+
+```bash
+cd SessionMonitor
+xcodebuild -scheme SessionMonitor -configuration Debug build
+# then open the built .app from DerivedData, or:
+open ~/Library/Developer/Xcode/DerivedData/SessionMonitor-*/Build/Products/Debug/SessionMonitor.app
+```
+
+First launch: allow **notifications** if prompted.
+
+## Usage
+
+| Action | How |
+|--------|-----|
+| Open panel | Click menu bar icon |
+| Toggle panel | **⌘⇧A** |
+| Hide panel | Escape, click outside, or blur |
+| Session actions | Right-click row → copy id / reveal cwd / activate stub |
+| Quit | Right-click menu bar icon → Quit, or Quit in panel footer |
+
+There is **no main window** on launch (`LSUIElement`).
+
+## Bridge path
 
 ```
 ~/Library/Application Support/agent-desktop/events.jsonl
 ```
 
-| Side | Role |
-|------|------|
-| Chat Hub | Produces `SessionEvent` lines |
-| Session Monitor | Replays + tails; merges into session list |
+Same path as Chat Hub. Override with `AGENT_DESKTOP_EVENTS`.
 
-Details: [docs/bridge.md](./docs/bridge.md). Override with `AGENT_DESKTOP_EVENTS`.
+Details: [docs/bridge.md](./docs/bridge.md)
 
-Both apps stay usable alone (mock sessions without Hub; Hub still writes without Monitor).
+## Docs
+
+- [Product](./docs/product.md)
+- [Architecture](./docs/architecture.md)
+- [Bridge](./docs/bridge.md)
 
 ## Project layout
 
 ```
-src/
-  main/           Electron main (tray, bus, registry, adapters)
-  preload/        contextBridge API
-  renderer/       React UI
-  shared/         SessionEvent types + IPC channels + bridge path
+SessionMonitor/
+  SessionMonitor.xcodeproj
+  SessionMonitor/
+    Models/          SessionStatus, SessionMeta, events
+    Services/        store, mock, bridge, notifs, hotkey
+    UI/              status item, island panel, list
+    AppDelegate.swift
 ```
 
-## Reliability notes
+## Legacy Electron scaffold
 
-- Live statuses (`running` / `waiting_input`) are demoted to `idle` on cold start
-- `running` with no bus events for 5 minutes becomes `error` (stale)
-- Permission/question payloads are kept on session meta for a future act UI
+Older Electron files may still exist under `src/` / `package.json` from an earlier experiment. **Canonical product is the native Xcode app** in `SessionMonitor/`.
 
-## Next
+## Next (real adapters)
 
-- Real CLI adapters (Grok / OpenCode) alongside the Hub bridge
-- Permission / question action UI (allow/deny answers)
-- Jump to terminal or Chat Hub session
+- Claude / Grok / Codex / OpenCode producers writing the same JSONL (or dedicated watchers)
+- Permission / question action UI
+- Jump to Chat Hub session or terminal
+- Optional true Dynamic Island private API / HUD polish

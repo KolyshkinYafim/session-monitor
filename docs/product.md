@@ -2,51 +2,46 @@
 
 ## Problem
 
-Много agent-сессий (Grok, Claude, Codex, OpenCode) → не видно:
+Many parallel AI coding agents (Grok, Claude, Codex, OpenCode, Chat Hub tabs) → hard to see:
 
-- кто running / stuck
-- кому нужен input / permission
-- когда done
+- who is running vs stuck
+- who needs input / permission
+- when work is done
 
-T3 и похожие chat-shells плохо держат multi-session overview. Notch-apps (Vibe Island) хороши на macOS, но это не chat hub и не всегда multi-provider deep.
+Chat shells keep you inside one conversation. Notch-style ambient UIs are better for multi-session glanceability.
 
 ## Goals
 
-1. **One glance** — все активные сессии
-2. **Reliable status** — только из event bus, не «Working timer навечно»
-3. **Notifications** — waiting_input, done, error, permission
-4. **Jump** — focus Chat Hub tab / terminal / project path
-5. **Local-first** — без cloud
+1. **One glance** — active sessions in a compact island panel
+2. **Reliable status** — driven by events, not fake “working” timers
+3. **Notifications** — `waiting_input`, `done`, `error`
+4. **Menu bar native** — no big document window on launch
+5. **Local-first** — no cloud
 
 ## Primary users
 
-Devs running 3–10 parallel coding agents.
+Developers running several coding agents at once.
 
 ## Core flows
 
 ### F1 — See sessions
-Tray / main compact list: title, provider, cwd, status, duration.
+Menu bar icon opens a top panel: title, provider, cwd, status, relative time.
 
 ### F2 — Get notified
-OS notification when status → `waiting_input` | `done` | `error`.
+OS notification when status becomes `waiting_input` | `done` | `error`.
 
-### F3 — Act (v1+)
-- Allow / Deny permission
-- Pick answer option
-- Open related Chat Hub session or terminal
+### F3 — Act (later)
+Allow/deny, answer questions, jump to Chat Hub or terminal.
 
-### F4 — Quiet hours / filters (later)
-Mute done, only waiting_input, per-project filter.
+## Non-goals
 
-## Non-goals (v0–v1)
-
-- Full transcript UI
-- Model marketplace
-- Team sync
-- Perfect Mac notch clone
+- Full transcript UI (Chat Hub)
+- Electron
+- Cloud sync
+- Perfect private Notch API clone on day one
 
 ## Success metrics
 
-- «Нужен input» видно < 2s без alt-tab в каждый terminal
-- Zero stuck `running` when process exited
-- Works with ≥2 providers in MVP
+- Needs-input visible in under ~2s without alt-tabbing every terminal
+- No permanent `running` after process exit (event or stale policy)
+- Works with mock + Chat Hub bridge in MVP

@@ -95,8 +95,8 @@ final class SessionStore {
             return
         }
         if let app = session.focusApp {
-            // Terminal (hook) session: bring its host terminal forward directly. No Hub round-trip.
-            let ok = commands.activateApp(bundleIdOrName: app)
+            // Terminal (hook) session: focus the exact tab/session when we can, else the app.
+            let ok = commands.focusTerminal(app: app, tty: session.tty, session: session.termSession)
             lastOpenResult = ok ? "Focusing terminal…" : "Terminal (\(app)) not running"
             return
         }
@@ -122,6 +122,8 @@ final class SessionStore {
         if next.focusApp == nil {
             next.focusApp = previous?.focusApp
         }
+        if next.tty == nil { next.tty = previous?.tty }
+        if next.termSession == nil { next.termSession = previous?.termSession }
         if next.status != .waitingInput {
             next.pending = nil
         }

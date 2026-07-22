@@ -48,6 +48,23 @@ TERM_BUNDLES = {
 }
 
 
+def terminal_ids():
+    """Best-effort identifiers to focus the *exact* terminal tab later."""
+    tty = None
+    try:
+        fd = os.open("/dev/tty", os.O_RDONLY)
+        try:
+            tty = os.ttyname(fd)  # e.g. /dev/ttys004
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
+    # iTerm2 exposes a per-session UUID via $ITERM_SESSION_ID = "w0t0p0:UUID".
+    iterm = os.environ.get("ITERM_SESSION_ID", "")
+    iterm_uuid = iterm.split(":", 1)[1] if ":" in iterm else (iterm or None)
+    return tty, iterm_uuid
+
+
 def focus_app():
     term = (os.environ.get("TERM_PROGRAM") or "").strip()
     if term in TERM_BUNDLES:
@@ -75,23 +92,25 @@ def build_events(data):
     now = int(time.time() * 1000)
     project = os.path.basename(cwd.rstrip("/")) or cwd
     app = focus_app()
+    tty, term_session = terminal_ids()
 
     def upsert(title, status):
-        return {
-            "type": "session.upsert",
-            "session": {
-                "id": sid,
-                "title": title,
-                "project": project,
-                "provider": "claude",
-                "cwd": cwd,
-                "status": status,
-                "focusApp": app,
-                "createdAt": now,
-                "updatedAt": now,
-            },
-            "ts": now,
+        session = {
+            "id": sid,
+            "title": title,
+            "project": project,
+            "provider": "claude",
+            "cwd": cwd,
+            "status": status,
+            "focusApp": app,
+            "createdAt": now,
+            "updatedAt": now,
         }
+        if tty:
+            session["tty"] = tty
+        if term_session:
+            session["termSession"] = term_session
+        return {"type": "session.upsert", "session": session, "ts": now}
 
     if event == "SessionStart":
         return [upsert("Claude · " + project, "idle")]

@@ -53,6 +53,81 @@ final class CommandBridge {
         return false
     }
 
+    /// Focus the *exact* terminal tab/session hosting a Claude hook session when we can
+    /// (iTerm by session id, Terminal.app by tty), else just bring the terminal forward.
+    /// Only ever drives an already-running terminal — never launches a new one.
+    @discardableResult
+    func focusTerminal(app: String, tty: String?, session: String?) -> Bool {
+        guard NSRunningApplication.runningApplications(withBundleIdentifier: app).first != nil else {
+            return activateApp(bundleIdOrName: app)
+        }
+        var script: String?
+        if app == "com.googlecode.iterm2", let session, !session.isEmpty {
+            script = itermScript(sessionId: session)
+        } else if app == "com.apple.Terminal", let tty, !tty.isEmpty {
+            script = terminalScript(tty: tty)
+        }
+        // The scripts `activate` first, so even a no-match still brings the terminal forward.
+        // If AppleScript is blocked (Automation permission not yet granted), fall back.
+        if let script, runAppleScript(script) {
+            return true
+        }
+        return activateApp(bundleIdOrName: app)
+    }
+
+    private func itermScript(sessionId: String) -> String {
+        """
+        tell application "iTerm2"
+          activate
+          repeat with w in windows
+            repeat with t in tabs of w
+              repeat with s in sessions of t
+                if (id of s) is "\(sessionId)" then
+                  select w
+                  select t
+                  select s
+                  return
+                end if
+              end repeat
+            end repeat
+          end repeat
+        end tell
+        """
+    }
+
+    private func terminalScript(tty: String) -> String {
+        """
+        tell application "Terminal"
+          activate
+          repeat with w in windows
+            repeat with t in tabs of w
+              if (tty of t) is "\(tty)" then
+                set selected of t to true
+                set frontmost of w to true
+                return
+              end if
+            end repeat
+          end repeat
+        end tell
+        """
+    }
+
+    @discardableResult
+    private func runAppleScript(_ source: String) -> Bool {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        proc.arguments = ["-e", source]
+        proc.standardOutput = FileHandle.nullDevice
+        proc.standardError = FileHandle.nullDevice
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            return proc.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+
     private func append(_ object: [String: Any]) {
         guard JSONSerialization.isValidJSONObject(object),
               let data = try? JSONSerialization.data(withJSONObject: object),

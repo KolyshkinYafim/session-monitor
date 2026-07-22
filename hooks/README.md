@@ -26,9 +26,14 @@ Install is **idempotent** and only touches its own hook entries — any other ho
 | `Stop` | `session.status` waiting_input | badge lights up — your turn |
 | `SessionEnd` | `session.ended` (done) | leaves the live list |
 
-Each session carries a `focusApp` (the host terminal, from `$TERM_PROGRAM`), so clicking the
-session in the island brings that terminal forward. v1 is monitor-only: you reply in the
-terminal, not from the island.
+Each session carries a `focusApp` (the host terminal, from `$TERM_PROGRAM`) plus, when
+available, a `tty` and iTerm `termSession` id. Clicking the session in the island brings the
+**exact terminal tab** forward — Terminal.app matched by tty, iTerm by session id — falling
+back to just the app otherwise. v1 is monitor-only: you reply in the terminal, not the island.
+
+> First time the island focuses a Terminal/iTerm tab, macOS asks to allow SessionMonitor to
+> control that app (Automation permission). Until you allow it, the click still brings the
+> terminal app forward — it just can't pick the exact tab.
 
 ## Guarantees
 

@@ -25,6 +25,10 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
     /// App to bring forward when this session is opened (bundle id or name). Set by terminal
     /// hook sessions to the host terminal; `nil` means route through Chat Hub (default).
     var focusApp: String?
+    /// Controlling terminal device (e.g. `/dev/ttys004`) — used to focus the exact Terminal.app tab.
+    var tty: String?
+    /// Terminal-specific session id (iTerm2 UUID) — used to focus the exact iTerm session.
+    var termSession: String?
 
     init(
         id: String,
@@ -35,7 +39,9 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         updatedAt: Date = Date(),
         createdAt: Date = Date(),
         pending: PendingInteraction? = nil,
-        focusApp: String? = nil
+        focusApp: String? = nil,
+        tty: String? = nil,
+        termSession: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -46,6 +52,8 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         self.createdAt = createdAt
         self.pending = pending
         self.focusApp = focusApp
+        self.tty = tty
+        self.termSession = termSession
     }
 
     /// Sessions that live in a terminal (via the Claude Code hook) rather than in Chat Hub.
@@ -59,7 +67,7 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, provider, cwd, status, updatedAt, createdAt, focusApp
+        case id, title, provider, cwd, status, updatedAt, createdAt, focusApp, tty, termSession
     }
 
     init(from decoder: Decoder) throws {
@@ -72,6 +80,8 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? updatedAt
         focusApp = try c.decodeIfPresent(String.self, forKey: .focusApp)
+        tty = try c.decodeIfPresent(String.self, forKey: .tty)
+        termSession = try c.decodeIfPresent(String.self, forKey: .termSession)
         pending = nil
     }
 }

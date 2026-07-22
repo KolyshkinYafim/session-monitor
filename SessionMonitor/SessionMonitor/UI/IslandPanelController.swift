@@ -2,6 +2,26 @@ import AppKit
 import QuartzCore
 import SwiftUI
 
+/// Borderless panels report `canBecomeKey == false` by default, which blocked the island from
+/// ever receiving Esc or text input. Forcing it makes the expanded board interactive so
+/// `.onExitCommand` and the reply field work reliably — without requiring Accessibility.
+private final class IslandPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
+/// Makes the island act on the *first* click even while it's in the background. Without this a
+/// non-activating panel swallows the first click just to take focus (so rows/buttons need a
+/// double click) — an ambient HUD should respond immediately, like Dynamic Island.
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    required init(rootView: Content) { super.init(rootView: rootView) }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
 @MainActor
 final class IslandPanelController: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
@@ -64,7 +84,6 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     func expand() {
         ui.expand()
         applySize(animated: true)
-        panel?.makeKey()
         scheduleAutoTuck()
     }
 
@@ -91,7 +110,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     private func ensurePanel() -> NSPanel {
         if let panel { return panel }
 
-        let panel = NSPanel(
+        let panel = IslandPanel(
             contentRect: NSRect(x: 0, y: 0, width: currentSize.width, height: currentSize.height),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
@@ -113,7 +132,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         panel.titlebarAppearsTransparent = true
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
-        panel.becomesKeyOnlyIfNeeded = true
+        panel.becomesKeyOnlyIfNeeded = false
         panel.acceptsMouseMovedEvents = true
         panel.delegate = self
         panel.animationBehavior = .none
@@ -130,7 +149,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
             },
             onQuit: onQuit
         )
-        let hosting = NSHostingView(rootView: root)
+        let hosting = FirstMouseHostingView(rootView: root)
         hosting.frame = NSRect(origin: .zero, size: currentSize)
         panel.contentView = hosting
         self.hostingView = hosting
@@ -149,7 +168,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(frame, display: true)
             } completionHandler: { [weak self] in
-                self?.forceFlushTop()
+                Task { @MainActor in self?.forceFlushTop() }
             }
         } else {
             panel.setFrame(frame, display: true)
@@ -165,9 +184,10 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         let full = screen.frame
         var frame = panel.frame
         let targetY = full.maxY - frame.height
-        if abs(frame.maxY - full.maxY) > 0.5 || abs(frame.origin.y - targetY) > 0.5 {
+        let targetX = clampedX(centeredWidth: frame.width, on: full)
+        if abs(frame.maxY - full.maxY) > 0.5 || abs(frame.origin.x - targetX) > 0.5 {
             frame.origin.y = targetY
-            frame.origin.x = full.midX - frame.width / 2
+            frame.origin.x = targetX
             panel.setFrame(frame, display: true)
         }
     }
@@ -176,22 +196,38 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         applySize(animated: false)
     }
 
-    /// Absolute top-center of the physical display (menu-bar / notch band).
+    /// Absolute top-center of the docking display (menu-bar / notch band).
     private func topCenterFrame(size: CGSize) -> NSRect {
         guard let screen = dockingScreen() else {
             return NSRect(origin: .zero, size: size)
         }
         let full = screen.frame
         // Top edge of window == top edge of screen. Zero gap.
-        let x = full.midX - size.width / 2
         let y = full.maxY - size.height
-        return NSRect(x: x, y: y, width: size.width, height: size.height)
+        return NSRect(x: clampedX(centeredWidth: size.width, on: full), y: y, width: size.width, height: size.height)
+    }
+
+    /// Horizontally centered on the display, but clamped inside its bounds so the panel can
+    /// never land off-screen (the old code produced X≈-949 on displays left of the primary).
+    private func clampedX(centeredWidth width: CGFloat, on full: NSRect) -> CGFloat {
+        let centered = full.midX - width / 2
+        return min(max(centered, full.minX), full.maxX - width)
     }
 
     private func dockingScreen() -> NSScreen? {
-        // Prefer screen under the mouse; fallback main.
-        let mouse = NSEvent.mouseLocation
-        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        // Always dock to the primary display — the one that owns the global origin (0,0) and the
+        // menu bar. We deliberately do NOT follow the mouse: that made the island jump between
+        // displays and pushed it off-screen (X≈-949) on a monitor positioned left of the primary.
+        let screens = NSScreen.screens
+        let primary = screens.first { $0.frame.origin == .zero }
+        return primary ?? NSScreen.main ?? screens.first
+    }
+
+    /// Re-arm the auto-tuck countdown from a discrete activity change (e.g. the last waiting
+    /// session just resolved). Safe to call from the status-change handler — it is NOT a poll,
+    /// so it won't reset the timer every tick the way the old badge poll did.
+    func refreshAutoTuck() {
+        scheduleAutoTuck()
     }
 
     private func scheduleAutoTuck() {
@@ -246,9 +282,8 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         }
     }
 
-    func windowDidResignKey(_ notification: Notification) {
-        if ui.mode == .expanded {
-            collapse()
-        }
-    }
+    // NOTE: intentionally no `windowDidResignKey` auto-collapse. As a non-activating accessory
+    // panel we never hold app activation, so relying on key-resignation made expand→collapse
+    // race (the panel would bounce shut the instant it opened). Click-outside is handled
+    // deterministically by the global mouse monitor below instead.
 }

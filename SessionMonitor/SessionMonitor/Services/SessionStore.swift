@@ -168,7 +168,11 @@ final class SessionStore {
 }
 
 extension SessionMeta {
+    /// True only for Session Monitor's *local* demo sessions (`MockProducer`, `mock-*` ids).
+    /// Chat Hub sessions always use UUIDs — even a Hub session on the "mock" provider is a
+    /// real, focusable Hub session, so it must NOT be treated as a local demo. Keying off the
+    /// provider string used to misclassify those and made Open-in-Hub / reply / badge refuse them.
     var isMock: Bool {
-        id.hasPrefix("mock-") || provider.lowercased() == "mock"
+        id.hasPrefix("mock-")
     }
 }

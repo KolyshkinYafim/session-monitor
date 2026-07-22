@@ -28,6 +28,10 @@ final class AppController {
             self?.statusItem?.updateBadge()
             if status == .waitingInput, !session.isMock {
                 self?.panel?.pulseForWaiting()
+            } else {
+                // A session left waiting (done/idle/error) — re-arm the auto-tuck countdown so the
+                // pill can retire into the menu bar once nothing needs attention.
+                self?.panel?.refreshAutoTuck()
             }
         }
 

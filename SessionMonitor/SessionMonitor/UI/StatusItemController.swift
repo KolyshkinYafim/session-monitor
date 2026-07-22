@@ -60,7 +60,10 @@ final class StatusItemController {
         guard let button = statusItem.button else { return }
         let count = store.waitingCount
         button.title = count > 0 ? " \(count)" : ""
-        panel.pulseForWaiting()
+        // NOTE: do NOT pulse/re-order the panel here. This runs on a 500ms poll, and pulsing
+        // reset the 10s auto-tuck timer every half-second (so it never fired) and re-ordered
+        // the panel constantly. The pulse is driven from AppController's status-change handler
+        // on a *real* waiting_input transition instead.
     }
 
     private static func makeIcon() -> NSImage {

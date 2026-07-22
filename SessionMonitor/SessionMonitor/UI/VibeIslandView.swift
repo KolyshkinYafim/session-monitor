@@ -11,10 +11,9 @@ struct VibeIslandView: View {
 
     private var currentSize: CGSize {
         switch ui.mode {
-        // Heights match menu-bar strip so the pill sits in the top “curtain”.
         case .tucked: CGSize(width: 120, height: 22)
-        case .pill: CGSize(width: store.waitingCount > 0 ? 188 : 152, height: 24)
-        case .expanded: CGSize(width: 392, height: 400)
+        case .pill: CGSize(width: store.waitingCount > 0 ? 176 : 148, height: 24)
+        case .expanded: CGSize(width: 392, height: 420)
         }
     }
 
@@ -47,7 +46,7 @@ struct VibeIslandView: View {
         }
     }
 
-    // MARK: - Tucked (into Mac “curtain”)
+    // MARK: - Tucked
 
     private var tuckedIsland: some View {
         Button {
@@ -55,19 +54,19 @@ struct VibeIslandView: View {
         } label: {
             HStack(spacing: 6) {
                 Capsule()
-                    .fill(Color.white.opacity(0.22))
+                    .fill(Color.white.opacity(0.2))
                     .frame(width: 36, height: 4)
                 if store.waitingCount > 0 {
                     Circle()
-                        .fill(Color.orange)
-                        .frame(width: 6, height: 6)
+                        .fill(Color.white.opacity(0.85))
+                        .frame(width: 5, height: 5)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(CurtainShell(topRadius: 0, bottomRadius: 10, waiting: store.waitingCount > 0))
+            .background(CurtainShell(topRadius: 0, bottomRadius: 10, emphasize: store.waitingCount > 0))
         }
         .buttonStyle(.plain)
-        .help("Session Monitor — click to show")
+        .help("Session Monitor")
     }
 
     // MARK: - Pill
@@ -78,44 +77,44 @@ struct VibeIslandView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: leadingSymbol)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(leadingColor)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.75))
 
                 HStack(spacing: -3) {
                     ForEach(collapsedDots.prefix(3)) { session in
                         Circle()
                             .fill(color(for: session.status))
-                            .frame(width: 7, height: 7)
-                            .overlay(Circle().stroke(Color.black.opacity(0.5), lineWidth: 0.8))
+                            .frame(width: 6, height: 6)
+                            .overlay(Circle().stroke(Color.black.opacity(0.55), lineWidth: 0.8))
                     }
                 }
 
+                // Number = sessions waiting for your input (real agents only).
                 if store.waitingCount > 0 {
                     Text("\(store.waitingCount)")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.orange))
-                } else {
+                        .background(Capsule().fill(Color.white.opacity(0.9)))
+                } else if liveCount > 0 {
                     Text("\(liveCount)")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.82))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
                 }
             }
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Flat top (flush to screen edge), rounded bottom only.
-            .background(CurtainShell(topRadius: 0, bottomRadius: 12, waiting: store.waitingCount > 0))
+            .background(CurtainShell(topRadius: 0, bottomRadius: 12, emphasize: store.waitingCount > 0))
         }
         .buttonStyle(.plain)
         .contextMenu {
             Button("Expand") { ui.expand() }
-            Button("Hide in menu bar") { ui.tuck() }
+            Button("Hide") { ui.tuck() }
             Divider()
             Button("Quit") { onQuit() }
         }
-        .help("Click to expand · ⌘⇧A · right-click to hide")
+        .help("Badge = agents waiting for input · ⌘⇧A expand")
     }
 
     // MARK: - Expanded
@@ -128,9 +127,17 @@ struct VibeIslandView: View {
             if let selected = selectedSession {
                 detailPane(selected)
             }
+            if let msg = store.lastOpenResult {
+                Text(msg)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+            }
             footer
         }
-        .background(CurtainShell(topRadius: 0, bottomRadius: 22, waiting: store.waitingCount > 0))
+        .background(CurtainShell(topRadius: 0, bottomRadius: 22, emphasize: store.waitingCount > 0))
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
@@ -147,7 +154,7 @@ struct VibeIslandView: View {
             ui.collapseToPill()
         } label: {
             Capsule()
-                .fill(Color.white.opacity(0.2))
+                .fill(Color.white.opacity(0.18))
                 .frame(width: 34, height: 4)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
@@ -162,15 +169,13 @@ struct VibeIslandView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sessions")
                     .font(.system(size: 13, weight: .semibold))
-                if store.waitingCount > 0 {
-                    Text("\(store.waitingCount) need your input")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.orange)
-                } else {
-                    Text("Live agents")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.4))
-                }
+                Text(
+                    store.waitingCount > 0
+                        ? "\(store.waitingCount) waiting for input"
+                        : "Live from Chat Hub"
+                )
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.4))
             }
             Spacer()
             Button {
@@ -178,34 +183,48 @@ struct VibeIslandView: View {
             } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.white.opacity(0.5))
                     .padding(6)
-                    .background(Circle().fill(Color.white.opacity(0.08)))
+                    .background(Circle().fill(Color.white.opacity(0.07)))
             }
             .buttonStyle(.plain)
-            .help("Hide into menu bar")
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 8)
     }
 
     private var sessionList: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 5) {
-                ForEach(store.islandSessions) { session in
-                    IslandSessionRow(
-                        session: session,
-                        selected: ui.selectedSessionId == session.id
-                    ) {
-                        ui.selectedSessionId = session.id
-                        store.openChat(sessionId: session.id, commands: commands)
-                    }
+        Group {
+            if store.islandSessions.isEmpty {
+                VStack(spacing: 6) {
+                    Text("No agent sessions yet")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Text("Start a chat in Chat Hub — it appears here")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.35))
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 5) {
+                        ForEach(store.islandSessions) { session in
+                            IslandSessionRow(
+                                session: session,
+                                selected: ui.selectedSessionId == session.id
+                            ) {
+                                ui.selectedSessionId = session.id
+                                store.openChat(sessionId: session.id, commands: commands)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+                }
+                .frame(maxHeight: selectedSession?.status == .waitingInput ? 160 : 240)
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 6)
         }
-        .frame(maxHeight: selectedSession?.status == .waitingInput ? 170 : 250)
     }
 
     @ViewBuilder
@@ -219,17 +238,21 @@ struct VibeIslandView: View {
                 Button {
                     store.openChat(sessionId: session.id, commands: commands)
                 } label: {
-                    Label("Open chat", systemImage: "arrow.up.right.square")
-                        .font(.system(size: 10, weight: .semibold))
+                    Label(
+                        session.isMock ? "Demo only" : "Open in Hub",
+                        systemImage: "arrow.up.right.square"
+                    )
+                    .font(.system(size: 10, weight: .semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color(red: 0.45, green: 0.82, blue: 1.0))
+                .foregroundStyle(.white.opacity(0.75))
+                .disabled(session.isMock)
             }
 
             if session.status == .waitingInput {
-                Text(session.pending?.promptText ?? "Agent is waiting for your input")
+                Text(session.pending?.promptText ?? "Waiting for your input")
                     .font(.system(size: 11))
-                    .foregroundStyle(.orange.opacity(0.95))
+                    .foregroundStyle(.white.opacity(0.7))
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let options = session.pending?.options, !options.isEmpty {
@@ -243,13 +266,13 @@ struct VibeIslandView: View {
                                 )
                                 ui.draftReply = ""
                             }
-                            .buttonStyle(IslandChipButton(accent: option.lowercased() == "deny"))
+                            .buttonStyle(IslandChipButton(destructive: option.lowercased() == "deny"))
                         }
                     }
                 }
 
                 HStack(spacing: 8) {
-                    TextField("Reply to agent…", text: $ui.draftReply)
+                    TextField("Reply…", text: $ui.draftReply)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .padding(.horizontal, 10)
@@ -267,15 +290,19 @@ struct VibeIslandView: View {
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(.black)
                             .frame(width: 32, height: 32)
-                            .background(Circle().fill(Color.white.opacity(0.92)))
+                            .background(Circle().fill(Color.white.opacity(0.9)))
                     }
                     .buttonStyle(.plain)
                     .disabled(ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-            } else {
-                Text("Click Open chat to jump into Chat Hub · right-click row for more")
+            } else if !session.isMock {
+                Text("Click row or Open in Hub to jump to this chat")
                     .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.35))
+            } else {
+                Text("Demo session — enable SESSION_MONITOR_MOCK=1 only for UI tests")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.35))
             }
         }
         .padding(12)
@@ -287,9 +314,9 @@ struct VibeIslandView: View {
 
     private var footer: some View {
         HStack {
-            Text("⌘⇧A toggle · Esc collapse · ↑ hide")
+            Text("⌘⇧A · Esc · number = waiting")
                 .font(.system(size: 9))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.white.opacity(0.28))
             Spacer()
             Button("Quit") { onQuit() }
                 .buttonStyle(.plain)
@@ -317,30 +344,24 @@ struct VibeIslandView: View {
     private var collapsedDots: [SessionMeta] { store.islandSessions }
 
     private var liveCount: Int {
-        store.sessions.filter(\.status.isLive).count
+        store.islandSessions.filter(\.status.isLive).count
     }
 
     private var hasLive: Bool { liveCount > 0 }
 
     private var leadingSymbol: String {
-        if store.waitingCount > 0 { return "exclamationmark.bubble.fill" }
+        if store.waitingCount > 0 { return "bell.fill" }
         if hasLive { return "waveform" }
         return "circle.grid.2x1.fill"
     }
 
-    private var leadingColor: Color {
-        if store.waitingCount > 0 { return .orange }
-        if hasLive { return Color(red: 0.4, green: 0.88, blue: 1.0) }
-        return .white.opacity(0.7)
-    }
-
     private func color(for status: SessionStatus) -> Color {
         switch status {
-        case .running: Color(red: 0.2, green: 0.9, blue: 0.45)
-        case .waitingInput: .orange
-        case .error: Color(red: 1.0, green: 0.35, blue: 0.3)
-        case .done: .white.opacity(0.3)
-        case .idle: .white.opacity(0.22)
+        case .running: Color.white.opacity(0.72)
+        case .waitingInput: Color.white.opacity(0.95)
+        case .error: Color.white.opacity(0.45)
+        case .done: Color.white.opacity(0.22)
+        case .idle: Color.white.opacity(0.18)
         }
     }
 }
@@ -355,24 +376,24 @@ struct IslandSessionRow: View {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(statusColor.opacity(0.16))
+                        .fill(Color.white.opacity(0.08))
                         .frame(width: 26, height: 26)
                     Image(systemName: providerSymbol)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(statusColor)
+                        .foregroundStyle(Color.white.opacity(0.7))
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(session.title)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.95))
+                        .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
                     HStack(spacing: 4) {
                         Text(session.provider.capitalized)
-                            .foregroundStyle(Color(red: 0.45, green: 0.82, blue: 1.0))
-                        Text("·").foregroundStyle(.white.opacity(0.22))
+                            .foregroundStyle(.white.opacity(0.5))
+                        Text("·").foregroundStyle(.white.opacity(0.2))
                         Text(shortPath(session.cwd))
-                            .foregroundStyle(.white.opacity(0.38))
+                            .foregroundStyle(.white.opacity(0.32))
                             .lineLimit(1)
                     }
                     .font(.system(size: 10))
@@ -383,10 +404,10 @@ struct IslandSessionRow: View {
                 Text(session.status.label)
                     .font(.system(size: 9, weight: .bold))
                     .textCase(.uppercase)
-                    .foregroundStyle(statusColor)
+                    .foregroundStyle(Color.white.opacity(statusOpacity))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Capsule().fill(statusColor.opacity(0.14)))
+                    .background(Capsule().fill(Color.white.opacity(0.08)))
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 8)
@@ -394,14 +415,14 @@ struct IslandSessionRow: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(selected || session.status == .waitingInput
                           ? Color.white.opacity(0.09)
-                          : Color.white.opacity(0.035))
+                          : Color.white.opacity(0.03))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(
-                        session.status == .waitingInput
-                            ? Color.orange.opacity(0.45)
-                            : Color.white.opacity(selected ? 0.12 : 0.04),
+                        Color.white.opacity(
+                            session.status == .waitingInput ? 0.22 : (selected ? 0.12 : 0.05)
+                        ),
                         lineWidth: 1
                     )
             )
@@ -421,13 +442,12 @@ struct IslandSessionRow: View {
         }
     }
 
-    private var statusColor: Color {
+    private var statusOpacity: Double {
         switch session.status {
-        case .running: Color(red: 0.2, green: 0.9, blue: 0.45)
-        case .waitingInput: .orange
-        case .error: Color(red: 1.0, green: 0.35, blue: 0.3)
-        case .done: .white.opacity(0.4)
-        case .idle: .white.opacity(0.32)
+        case .waitingInput: 0.9
+        case .running: 0.7
+        case .error: 0.55
+        default: 0.4
         }
     }
 
@@ -450,26 +470,25 @@ struct IslandSessionRow: View {
 }
 
 private struct IslandChipButton: ButtonStyle {
-    var accent: Bool = false
+    var destructive: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(accent ? Color.red.opacity(0.9) : Color.white.opacity(0.92))
+            .foregroundStyle(Color.white.opacity(destructive ? 0.55 : 0.9))
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(
-                Capsule().fill(accent ? Color.red.opacity(0.14) : Color.white.opacity(0.1))
+                Capsule().fill(Color.white.opacity(destructive ? 0.06 : 0.1))
             )
             .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
 
-/// Top edge flat (tucks into menu bar), bottom rounded like Dynamic Island growth.
 private struct CurtainShell: View {
     var topRadius: CGFloat
     var bottomRadius: CGFloat
-    var waiting: Bool
+    var emphasize: Bool
 
     var body: some View {
         let shape = UnevenRoundedRectangle(
@@ -480,26 +499,20 @@ private struct CurtainShell: View {
             style: .continuous
         )
         ZStack {
-            shape.fill(Color.black.opacity(0.96))
+            shape.fill(Color.black.opacity(0.97))
             shape.fill(
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.12),
-                        Color.white.opacity(0.03),
+                        Color.white.opacity(0.1),
+                        Color.white.opacity(0.02),
                         Color.clear
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            shape.stroke(Color.white.opacity(waiting ? 0.18 : 0.1), lineWidth: 1)
-            if waiting {
-                shape.stroke(Color.orange.opacity(0.35), lineWidth: 1)
-            }
+            shape.stroke(Color.white.opacity(emphasize ? 0.16 : 0.09), lineWidth: 1)
         }
-        // Soft drop only below — not a free-floating card in the middle of the desktop.
         .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
-        .shadow(color: waiting ? Color.orange.opacity(0.2) : .clear, radius: 10, y: 2)
     }
 }
-

@@ -5,7 +5,9 @@ import Observation
 @Observable
 final class SessionStore {
     private(set) var sessions: [SessionMeta] = []
+    /// Waiting sessions that can open in Chat Hub (excludes mock-*).
     private(set) var waitingCount: Int = 0
+    private(set) var lastOpenResult: String?
 
     private var byId: [String: SessionMeta] = [:]
     private var onStatusChange: ((SessionMeta, SessionStatus, SessionStatus?) -> Void)?
@@ -24,11 +26,13 @@ final class SessionStore {
         }
     }
 
-    /// Prefer actionable sessions in the island list.
+    /// Hub / real sessions only (mock demos hidden when real data exists).
     var islandSessions: [SessionMeta] {
-        let live = orderedSessions.filter(\.status.isLive)
+        let real = orderedSessions.filter { !$0.isMock }
+        let source = real.isEmpty ? orderedSessions : real
+        let live = source.filter(\.status.isLive)
         if !live.isEmpty { return live }
-        return Array(orderedSessions.prefix(6))
+        return Array(source.prefix(8))
     }
 
     func apply(_ event: SessionEvent) {
@@ -55,7 +59,12 @@ final class SessionStore {
     func answer(sessionId: String, text: String, commands: CommandBridge) {
         guard var session = byId[sessionId] else { return }
         let requestId = session.pending?.requestId
-        commands.reply(sessionId: sessionId, requestId: requestId, text: text)
+        if session.isMock {
+            lastOpenResult = "Demo session — reply is local only"
+        } else {
+            commands.reply(sessionId: sessionId, requestId: requestId, text: text)
+            lastOpenResult = "Reply sent to Chat Hub"
+        }
         session.pending = nil
         session.status = .running
         session.updatedAt = Date()
@@ -64,7 +73,19 @@ final class SessionStore {
     }
 
     func openChat(sessionId: String, commands: CommandBridge) {
-        commands.focusSession(id: sessionId)
+        guard let session = byId[sessionId] else { return }
+        if session.isMock {
+            lastOpenResult = "Demo session (mock) — not in Chat Hub"
+            return
+        }
+        let ok = commands.focusSession(id: sessionId)
+        lastOpenResult = ok
+            ? "Opening in Chat Hub…"
+            : "Chat Hub not running — start it (pnpm dev), then retry"
+    }
+
+    func clearOpenResult() {
+        lastOpenResult = nil
     }
 
     func upsert(_ session: SessionMeta) {
@@ -141,6 +162,13 @@ final class SessionStore {
 
     private func publish() {
         sessions = Array(byId.values)
-        waitingCount = sessions.filter { $0.status == .waitingInput }.count
+        // Badge = real agents waiting for you (not demo mock cycle).
+        waitingCount = sessions.filter { $0.status == .waitingInput && !$0.isMock }.count
+    }
+}
+
+extension SessionMeta {
+    var isMock: Bool {
+        id.hasPrefix("mock-") || provider.lowercased() == "mock"
     }
 }

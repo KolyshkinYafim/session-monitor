@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Writes reverse commands for Chat Hub (and local mock handling).
+/// Writes reverse commands for Chat Hub.
 @MainActor
 final class CommandBridge {
     private let fileURL: URL
@@ -10,13 +10,14 @@ final class CommandBridge {
         self.fileURL = fileURL
     }
 
-    func focusSession(id: String) {
+    @discardableResult
+    func focusSession(id: String) -> Bool {
         append([
             "type": "session.focus",
             "id": id,
             "ts": Int(Date().timeIntervalSince1970 * 1000)
         ])
-        activateChatHub()
+        return activateChatHub()
     }
 
     func reply(sessionId: String, requestId: String?, text: String) {
@@ -30,7 +31,7 @@ final class CommandBridge {
             payload["requestId"] = requestId
         }
         append(payload)
-        activateChatHub()
+        _ = activateChatHub()
     }
 
     private func append(_ object: [String: Any]) {
@@ -50,36 +51,35 @@ final class CommandBridge {
         try? handle.write(contentsOf: Data(line.utf8))
     }
 
-    private func activateChatHub() {
-        let candidates = [
-            "com.agentdesktop.ChatHub",
-            "com.electron.chat-hub",
-            "chat-hub"
-        ]
-        for bundleId in candidates {
-            let apps = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
-            if let app = apps.first {
+    /// Returns true if a Chat Hub / chat-hub Electron process was activated.
+    private func activateChatHub() -> Bool {
+        let apps = NSWorkspace.shared.runningApplications
+        for app in apps {
+            let path = (app.executableURL?.path ?? "") + " " + (app.bundleURL?.path ?? "")
+            let name = app.localizedName ?? ""
+            let hit =
+                path.localizedCaseInsensitiveContains("chat-hub")
+                || name.localizedCaseInsensitiveContains("Chat Hub")
+                || name == "Electron" && path.localizedCaseInsensitiveContains("agent-desktop-suite")
+            if hit {
                 app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-                return
+                return true
             }
         }
 
-        // Best-effort: open any running Electron named Chat Hub via AppleScript.
-        let script = """
-        tell application "System Events"
-          set procs to name of every process whose background only is false
-          repeat with p in procs
-            if p contains "Chat Hub" or p contains "chat-hub" or p contains "Electron" then
-              try
-                set frontmost of process p to true
-                return
-              end try
-            end if
-          end repeat
-        end tell
-        """
-        if let appleScript = NSAppleScript(source: script) {
-            appleScript.executeAndReturnError(nil)
+        // Bundle id candidates
+        for bundleId in ["com.agentdesktop.ChatHub", "com.electron.chat-hub"] {
+            if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
+                app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+                return true
+            }
         }
+
+        // Last resort: Electron processes (dev hub)
+        for app in apps where app.localizedName == "Electron" {
+            app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            return true
+        }
+        return false
     }
 }

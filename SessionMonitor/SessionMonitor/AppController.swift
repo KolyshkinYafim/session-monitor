@@ -21,9 +21,12 @@ final class AppController {
         self.panel = panel
 
         store.setStatusChangeHandler { [weak self] session, status, previous in
-            self?.notifications.notifyIfNeeded(session: session, status: status, previous: previous)
+            // Don't spam OS notifs for demo mock sessions.
+            if !session.isMock {
+                self?.notifications.notifyIfNeeded(session: session, status: status, previous: previous)
+            }
             self?.statusItem?.updateBadge()
-            if status == .waitingInput {
+            if status == .waitingInput, !session.isMock {
                 self?.panel?.pulseForWaiting()
             }
         }
@@ -31,9 +34,14 @@ final class AppController {
         panel.start()
         statusItem = StatusItemController(store: store, panel: panel)
 
-        let mock = MockProducer(store: store)
-        mock.start()
-        self.mock = mock
+        // Mock only when explicitly enabled — otherwise badge jumps 1/2 randomly.
+        let mockEnabled =
+            ProcessInfo.processInfo.environment["SESSION_MONITOR_MOCK"] == "1"
+        if mockEnabled {
+            let mock = MockProducer(store: store)
+            mock.start()
+            self.mock = mock
+        }
 
         let bridge = ChatHubBridge(store: store)
         bridge.start()

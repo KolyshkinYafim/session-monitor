@@ -1,6 +1,5 @@
 import AppKit
 
-/// Minimal accessory control (quit / toggle). Primary UI is the top-center island.
 @MainActor
 final class StatusItemController {
     private let statusItem: NSStatusItem
@@ -15,9 +14,9 @@ final class StatusItemController {
         if let button = statusItem.button {
             button.image = Self.makeIcon()
             button.imagePosition = .imageLeft
-            button.action = #selector(toggle)
+            button.action = #selector(clicked)
             button.target = self
-            button.toolTip = "Session Monitor (island lives under the notch)"
+            button.toolTip = "Session Monitor"
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         updateBadge()
@@ -29,7 +28,7 @@ final class StatusItemController {
         }
     }
 
-    @objc private func toggle() {
+    @objc private func clicked() {
         guard let event = NSApp.currentEvent else {
             panel.toggleExpanded()
             return
@@ -43,10 +42,10 @@ final class StatusItemController {
 
     private func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Expand Island", action: #selector(expand), keyEquivalent: "")
-        menu.addItem(withTitle: "Collapse Island", action: #selector(collapse), keyEquivalent: "")
+        menu.addItem(withTitle: "Show Island", action: #selector(expand), keyEquivalent: "")
+        menu.addItem(withTitle: "Hide in menu bar", action: #selector(tuck), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit Session Monitor", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit", action: #selector(quit), keyEquivalent: "q")
         for item in menu.items { item.target = self }
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
@@ -54,7 +53,7 @@ final class StatusItemController {
     }
 
     @objc private func expand() { panel.expand() }
-    @objc private func collapse() { panel.collapse() }
+    @objc private func tuck() { panel.tuck() }
     @objc private func quit() { NSApp.terminate(nil) }
 
     func updateBadge() {
@@ -76,7 +75,5 @@ final class StatusItemController {
         return image
     }
 
-    deinit {
-        observationTask?.cancel()
-    }
+    deinit { observationTask?.cancel() }
 }

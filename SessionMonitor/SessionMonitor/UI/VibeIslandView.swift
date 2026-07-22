@@ -4,74 +4,88 @@ import SwiftUI
 struct VibeIslandView: View {
     @Bindable var store: SessionStore
     @Bindable var ui: IslandUIState
+    var commands: CommandBridge
     var bridgePath: String
     var onSizeChange: (CGSize) -> Void
     var onQuit: () -> Void
 
-    private let collapsedSize = CGSize(width: 168, height: 36)
-    private let expandedSize = CGSize(width: 380, height: 360)
+    private var currentSize: CGSize {
+        switch ui.mode {
+        case .tucked: CGSize(width: 126, height: 28)
+        case .pill: CGSize(width: store.waitingCount > 0 ? 196 : 158, height: 34)
+        case .expanded: CGSize(width: 392, height: 420)
+        }
+    }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            if ui.isExpanded {
+        Group {
+            switch ui.mode {
+            case .tucked:
+                tuckedIsland
+            case .pill:
+                pillIsland
+            case .expanded:
                 expandedIsland
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top)),
-                            removal: .opacity.combined(with: .scale(scale: 0.94, anchor: .top))
-                        )
-                    )
-            } else {
-                collapsedIsland
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)),
-                            removal: .opacity.combined(with: .scale(scale: 0.9, anchor: .top))
-                        )
-                    )
             }
         }
-        .frame(
-            width: ui.isExpanded ? expandedSize.width : collapsedSize.width,
-            height: ui.isExpanded ? expandedSize.height : collapsedSize.height,
-            alignment: .top
-        )
-        .animation(.spring(response: 0.34, dampingFraction: 0.82), value: ui.isExpanded)
-        .onAppear {
-            emitSize()
-        }
-        .onChange(of: ui.isExpanded) { _, _ in
-            emitSize()
+        .frame(width: currentSize.width, height: currentSize.height, alignment: .top)
+        .animation(.spring(response: 0.36, dampingFraction: 0.86), value: ui.mode)
+        .onAppear { onSizeChange(currentSize) }
+        .onChange(of: ui.mode) { _, _ in onSizeChange(currentSize) }
+        .onChange(of: store.waitingCount) { _, count in
+            if count > 0, ui.mode == .tucked {
+                ui.mode = .pill
+            }
         }
         .onExitCommand {
-            if ui.isExpanded {
-                ui.collapse()
+            if ui.mode == .expanded {
+                ui.collapseToPill()
+            } else if ui.mode == .pill {
+                ui.tuck()
             }
         }
     }
 
-    private func emitSize() {
-        onSizeChange(ui.isExpanded ? expandedSize : collapsedSize)
+    // MARK: - Tucked (into Mac “curtain”)
+
+    private var tuckedIsland: some View {
+        Button {
+            ui.mode = store.waitingCount > 0 || hasLive ? .pill : .expanded
+        } label: {
+            HStack(spacing: 6) {
+                Capsule()
+                    .fill(Color.white.opacity(0.22))
+                    .frame(width: 36, height: 4)
+                if store.waitingCount > 0 {
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 6, height: 6)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(CurtainShell(topRadius: 0, bottomRadius: 14, waiting: store.waitingCount > 0))
+        }
+        .buttonStyle(.plain)
+        .help("Session Monitor — click to show")
     }
 
-    // MARK: - Collapsed (notch pill)
+    // MARK: - Pill
 
-    private var collapsedIsland: some View {
+    private var pillIsland: some View {
         Button {
             ui.expand()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: leadingSymbol)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(leadingColor)
-                    .symbolEffect(.pulse, isActive: store.waitingCount > 0 || hasRunning)
 
-                HStack(spacing: -4) {
+                HStack(spacing: -3) {
                     ForEach(collapsedDots.prefix(3)) { session in
                         Circle()
                             .fill(color(for: session.status))
-                            .frame(width: 8, height: 8)
-                            .overlay(Circle().stroke(Color.black.opacity(0.45), lineWidth: 1))
+                            .frame(width: 7, height: 7)
+                            .overlay(Circle().stroke(Color.black.opacity(0.5), lineWidth: 0.8))
                     }
                 }
 
@@ -80,158 +94,242 @@ struct VibeIslandView: View {
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 1)
                         .background(Capsule().fill(Color.orange))
-                } else if !store.orderedSessions.isEmpty {
+                } else {
                     Text("\(liveCount)")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(.white.opacity(0.82))
                 }
             }
             .padding(.horizontal, 14)
-            .frame(height: 36)
-            .frame(maxWidth: .infinity)
-            .background(IslandShell(cornerRadius: 20, waiting: store.waitingCount > 0))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(CurtainShell(topRadius: 0, bottomRadius: 18, waiting: store.waitingCount > 0))
         }
         .buttonStyle(.plain)
-        .help("Session Monitor — click to expand · ⌘⇧A")
+        .contextMenu {
+            Button("Expand") { ui.expand() }
+            Button("Hide in menu bar") { ui.tuck() }
+            Divider()
+            Button("Quit") { onQuit() }
+        }
+        .help("Click to expand · ⌘⇧A · right-click to hide")
     }
 
     // MARK: - Expanded
 
     private var expandedIsland: some View {
         VStack(spacing: 0) {
-            expandedHeader
-            if store.orderedSessions.isEmpty {
-                emptyState
-            } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 6) {
-                        ForEach(store.orderedSessions) { session in
-                            IslandSessionRow(
-                                session: session,
-                                highlighted: ui.highlightSessionId == session.id
-                            ) {
-                                ui.highlightSessionId = session.id
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                }
+            dragHandle
+            header
+            sessionList
+            if let selected = selectedSession {
+                detailPane(selected)
             }
-            expandedFooter
+            footer
         }
-        .background(IslandShell(cornerRadius: 26, waiting: store.waitingCount > 0))
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(CurtainShell(topRadius: 0, bottomRadius: 24, waiting: store.waitingCount > 0))
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 24,
+                bottomTrailingRadius: 24,
+                topTrailingRadius: 0,
+                style: .continuous
+            )
+        )
     }
 
-    private var expandedHeader: some View {
-        HStack(spacing: 10) {
-            Button {
-                ui.collapse()
-            } label: {
-                HStack(spacing: 8) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.22))
-                        .frame(width: 28, height: 4)
-                }
-                .frame(maxWidth: .infinity)
+    private var dragHandle: some View {
+        Button {
+            ui.collapseToPill()
+        } label: {
+            Capsule()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 34, height: 4)
                 .padding(.top, 8)
-                .padding(.bottom, 2)
-            }
-            .buttonStyle(.plain)
+                .padding(.bottom, 4)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
         }
-        .overlay(alignment: .topLeading) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+        .buttonStyle(.plain)
+    }
+
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Sessions")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                 if store.waitingCount > 0 {
-                    Text("\(store.waitingCount) need input")
+                    Text("\(store.waitingCount) need your input")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.orange)
+                } else {
+                    Text("Live agents")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.4))
                 }
             }
-            .padding(.leading, 14)
-            .padding(.top, 18)
+            Spacer()
+            Button {
+                ui.tuck()
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .padding(6)
+                    .background(Circle().fill(Color.white.opacity(0.08)))
+            }
+            .buttonStyle(.plain)
+            .help("Hide into menu bar")
         }
-        .overlay(alignment: .topTrailing) {
-            Text("\(store.orderedSessions.count)")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
-                .padding(.trailing, 14)
-                .padding(.top, 18)
-        }
-        .frame(height: 40)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 6) {
-            Spacer()
-            Image(systemName: "waveform.path.ecg")
-                .font(.system(size: 22, weight: .light))
-                .foregroundStyle(.white.opacity(0.35))
-            Text("No live sessions")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.7))
-            Text("Waiting for agents…")
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.35))
-            Spacer()
+    private var sessionList: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVStack(spacing: 5) {
+                ForEach(store.islandSessions) { session in
+                    IslandSessionRow(
+                        session: session,
+                        selected: ui.selectedSessionId == session.id
+                    ) {
+                        ui.selectedSessionId = session.id
+                        store.openChat(sessionId: session.id, commands: commands)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxHeight: selectedSession?.status == .waitingInput ? 170 : 250)
     }
 
-    private var expandedFooter: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "link")
-                .font(.system(size: 9, weight: .semibold))
-            Text(bridgePath)
-                .font(.system(size: 9, design: .monospaced))
-                .lineLimit(1)
-                .truncationMode(.middle)
+    @ViewBuilder
+    private func detailPane(_ session: SessionMeta) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(session.title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Spacer()
+                Button {
+                    store.openChat(sessionId: session.id, commands: commands)
+                } label: {
+                    Label("Open chat", systemImage: "arrow.up.right.square")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color(red: 0.45, green: 0.82, blue: 1.0))
+            }
+
+            if session.status == .waitingInput {
+                Text(session.pending?.promptText ?? "Agent is waiting for your input")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange.opacity(0.95))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let options = session.pending?.options, !options.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(options, id: \.self) { option in
+                            Button(option) {
+                                store.answer(
+                                    sessionId: session.id,
+                                    text: option,
+                                    commands: commands
+                                )
+                                ui.draftReply = ""
+                            }
+                            .buttonStyle(IslandChipButton(accent: option.lowercased() == "deny"))
+                        }
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    TextField("Reply to agent…", text: $ui.draftReply)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.white.opacity(0.07))
+                        )
+                        .onSubmit { sendDraft(for: session) }
+
+                    Button {
+                        sendDraft(for: session)
+                    } label: {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(Color.white.opacity(0.92)))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } else {
+                Text("Click Open chat to jump into Chat Hub · right-click row for more")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.04))
+        .overlay(alignment: .top) {
+            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            Text("⌘⇧A toggle · Esc collapse · ↑ hide")
+                .font(.system(size: 9))
+                .foregroundStyle(.white.opacity(0.3))
             Spacer()
             Button("Quit") { onQuit() }
                 .buttonStyle(.plain)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.white.opacity(0.4))
         }
-        .foregroundStyle(.white.opacity(0.35))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
-    private var collapsedDots: [SessionMeta] {
-        let priority: [SessionStatus] = [.waitingInput, .error, .running, .idle, .done]
-        return store.orderedSessions.sorted { a, b in
-            let ia = priority.firstIndex(of: a.status) ?? 99
-            let ib = priority.firstIndex(of: b.status) ?? 99
-            if ia != ib { return ia < ib }
-            return a.updatedAt > b.updatedAt
-        }
+    private func sendDraft(for session: SessionMeta) {
+        let text = ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        store.answer(sessionId: session.id, text: text, commands: commands)
+        ui.draftReply = ""
     }
+
+    private var selectedSession: SessionMeta? {
+        guard let id = ui.selectedSessionId else {
+            return store.islandSessions.first { $0.status == .waitingInput } ?? store.islandSessions.first
+        }
+        return store.sessions.first { $0.id == id } ?? store.islandSessions.first
+    }
+
+    private var collapsedDots: [SessionMeta] { store.islandSessions }
 
     private var liveCount: Int {
-        store.orderedSessions.filter { $0.status == .running || $0.status == .waitingInput }.count
+        store.sessions.filter(\.status.isLive).count
     }
 
-    private var hasRunning: Bool {
-        store.orderedSessions.contains { $0.status == .running }
-    }
+    private var hasLive: Bool { liveCount > 0 }
 
     private var leadingSymbol: String {
         if store.waitingCount > 0 { return "exclamationmark.bubble.fill" }
-        if hasRunning { return "ellipsis.bubble.fill" }
-        return "circle.grid.2x2.fill"
+        if hasLive { return "waveform" }
+        return "circle.grid.2x1.fill"
     }
 
     private var leadingColor: Color {
         if store.waitingCount > 0 { return .orange }
-        if hasRunning { return Color(red: 0.35, green: 0.85, blue: 1.0) }
-        return .white.opacity(0.75)
+        if hasLive { return Color(red: 0.4, green: 0.88, blue: 1.0) }
+        return .white.opacity(0.7)
     }
 
     private func color(for status: SessionStatus) -> Color {
@@ -239,15 +337,15 @@ struct VibeIslandView: View {
         case .running: Color(red: 0.2, green: 0.9, blue: 0.45)
         case .waitingInput: .orange
         case .error: Color(red: 1.0, green: 0.35, blue: 0.3)
-        case .done: .white.opacity(0.35)
-        case .idle: .white.opacity(0.25)
+        case .done: .white.opacity(0.3)
+        case .idle: .white.opacity(0.22)
         }
     }
 }
 
 struct IslandSessionRow: View {
     let session: SessionMeta
-    var highlighted: Bool
+    var selected: Bool
     var onSelect: () -> Void
 
     var body: some View {
@@ -255,73 +353,69 @@ struct IslandSessionRow: View {
             HStack(spacing: 10) {
                 ZStack {
                     Circle()
-                        .fill(statusColor.opacity(0.18))
-                        .frame(width: 28, height: 28)
+                        .fill(statusColor.opacity(0.16))
+                        .frame(width: 26, height: 26)
                     Image(systemName: providerSymbol)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(statusColor)
                 }
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(session.title)
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.95))
                         .lineLimit(1)
                     HStack(spacing: 4) {
                         Text(session.provider.capitalized)
                             .foregroundStyle(Color(red: 0.45, green: 0.82, blue: 1.0))
-                        Text("·").foregroundStyle(.white.opacity(0.25))
+                        Text("·").foregroundStyle(.white.opacity(0.22))
                         Text(shortPath(session.cwd))
-                            .foregroundStyle(.white.opacity(0.4))
+                            .foregroundStyle(.white.opacity(0.38))
                             .lineLimit(1)
-                        Text("·").foregroundStyle(.white.opacity(0.25))
-                        Text(relativeTime(session.updatedAt))
-                            .foregroundStyle(.white.opacity(0.4))
                     }
-                    .font(.system(size: 10.5))
+                    .font(.system(size: 10))
                 }
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 4)
 
                 Text(session.status.label)
                     .font(.system(size: 9, weight: .bold))
                     .textCase(.uppercase)
-                    .tracking(0.3)
                     .foregroundStyle(statusColor)
                     .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 3)
                     .background(Capsule().fill(statusColor.opacity(0.14)))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 8)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(highlighted || session.status == .waitingInput
-                          ? Color.white.opacity(0.08)
-                          : Color.white.opacity(0.04))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(selected || session.status == .waitingInput
+                          ? Color.white.opacity(0.09)
+                          : Color.white.opacity(0.035))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(
                         session.status == .waitingInput
-                            ? Color.orange.opacity(0.4)
-                            : Color.white.opacity(0.05),
+                            ? Color.orange.opacity(0.45)
+                            : Color.white.opacity(selected ? 0.12 : 0.04),
                         lineWidth: 1
                     )
             )
         }
         .buttonStyle(.plain)
         .contextMenu {
+            Button("Open in Chat Hub") { onSelect() }
             Button("Copy session ID") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(session.id, forType: .string)
             }
             if let cwd = session.cwd, !cwd.isEmpty {
-                Button("Reveal in Finder") {
+                Button("Reveal project") {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: cwd)])
                 }
             }
-            Button("Open in Chat Hub (soon)") {}
         }
     }
 
@@ -330,8 +424,8 @@ struct IslandSessionRow: View {
         case .running: Color(red: 0.2, green: 0.9, blue: 0.45)
         case .waitingInput: .orange
         case .error: Color(red: 1.0, green: 0.35, blue: 0.3)
-        case .done: .white.opacity(0.45)
-        case .idle: .white.opacity(0.35)
+        case .done: .white.opacity(0.4)
+        case .idle: .white.opacity(0.32)
         }
     }
 
@@ -351,56 +445,57 @@ struct IslandSessionRow: View {
         if parts.count <= 2 { return cwd }
         return "…/" + parts.suffix(2).joined(separator: "/")
     }
+}
 
-    private func relativeTime(_ date: Date) -> String {
-        let seconds = max(0, Int(Date().timeIntervalSince(date)))
-        if seconds < 60 { return "\(seconds)s" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes)m" }
-        return "\(minutes / 60)h"
+private struct IslandChipButton: ButtonStyle {
+    var accent: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(accent ? Color.red.opacity(0.9) : Color.white.opacity(0.92))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(accent ? Color.red.opacity(0.14) : Color.white.opacity(0.1))
+            )
+            .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
 
-private struct IslandShell: View {
-    var cornerRadius: CGFloat
+/// Top edge flat (tucks into menu bar), bottom rounded like Dynamic Island growth.
+private struct CurtainShell: View {
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
     var waiting: Bool
 
     var body: some View {
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: topRadius,
+            bottomLeadingRadius: bottomRadius,
+            bottomTrailingRadius: bottomRadius,
+            topTrailingRadius: topRadius,
+            style: .continuous
+        )
         ZStack {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(Color.black.opacity(0.94))
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.10),
-                            Color.white.opacity(0.02),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+            shape.fill(Color.black.opacity(0.96))
+            shape.fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.12),
+                        Color.white.opacity(0.03),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.22),
-                            Color.white.opacity(waiting ? 0.14 : 0.06),
-                            Color.white.opacity(0.04)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            )
+            shape.stroke(Color.white.opacity(waiting ? 0.18 : 0.1), lineWidth: 1)
             if waiting {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.orange.opacity(0.35), lineWidth: 1.2)
-                    .blur(radius: 0.2)
+                shape.stroke(Color.orange.opacity(0.35), lineWidth: 1)
             }
         }
-        .shadow(color: .black.opacity(0.55), radius: 18, y: 8)
-        .shadow(color: waiting ? Color.orange.opacity(0.25) : .clear, radius: 14, y: 0)
+        .shadow(color: .black.opacity(0.45), radius: 16, y: 10)
+        .shadow(color: waiting ? Color.orange.opacity(0.22) : .clear, radius: 12, y: 0)
     }
 }

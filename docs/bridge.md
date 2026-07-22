@@ -22,3 +22,16 @@ Matches Chat Hub `docs/bridge.md`.
 ## Format
 
 Append-only JSONL, one event per line. See Chat Hub bridge doc for examples.
+
+## Reverse channel (Monitor → Hub)
+
+```
+~/Library/Application Support/agent-desktop/commands.jsonl
+```
+
+| Command | Purpose |
+|---------|---------|
+| `{"type":"session.focus","id":"..."}` | Open / focus chat in Hub |
+| `{"type":"session.reply","id":"...","text":"...","requestId":"..."}` | Send answer to waiting agent |
+
+Override with `AGENT_DESKTOP_COMMANDS`.

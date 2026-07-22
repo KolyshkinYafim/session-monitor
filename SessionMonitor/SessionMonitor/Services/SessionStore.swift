@@ -15,7 +15,20 @@ final class SessionStore {
     }
 
     var orderedSessions: [SessionMeta] {
-        sessions.sorted { $0.updatedAt > $1.updatedAt }
+        let priority: [SessionStatus] = [.waitingInput, .error, .running, .idle, .done]
+        return sessions.sorted { a, b in
+            let ia = priority.firstIndex(of: a.status) ?? 99
+            let ib = priority.firstIndex(of: b.status) ?? 99
+            if ia != ib { return ia < ib }
+            return a.updatedAt > b.updatedAt
+        }
+    }
+
+    /// Prefer actionable sessions in the island list.
+    var islandSessions: [SessionMeta] {
+        let live = orderedSessions.filter(\.status.isLive)
+        if !live.isEmpty { return live }
+        return Array(orderedSessions.prefix(6))
     }
 
     func apply(_ event: SessionEvent) {
@@ -23,17 +36,35 @@ final class SessionStore {
         case .upsert(let session):
             upsert(session)
         case .status(let id, let status):
-            setStatus(id: id, status: status)
+            setStatus(id: id, status: status, clearPending: status != .waitingInput)
         case .ended(let id, let reason):
             let status: SessionStatus = reason == .error ? .error : .done
-            setStatus(id: id, status: status)
-        case .permission(let id, _, _):
-            setStatus(id: id, status: .waitingInput)
-        case .question(let id, _, _, _):
-            setStatus(id: id, status: .waitingInput)
+            setStatus(id: id, status: status, clearPending: true)
+        case .permission(let id, let requestId, let summary):
+            setPending(id: id, pending: .permission(requestId: requestId, summary: summary))
+        case .question(let id, let requestId, let prompt, let options):
+            setPending(
+                id: id,
+                pending: .question(requestId: requestId, prompt: prompt, options: options)
+            )
         case .message(let id, _, _):
             touch(id: id)
         }
+    }
+
+    func answer(sessionId: String, text: String, commands: CommandBridge) {
+        guard var session = byId[sessionId] else { return }
+        let requestId = session.pending?.requestId
+        commands.reply(sessionId: sessionId, requestId: requestId, text: text)
+        session.pending = nil
+        session.status = .running
+        session.updatedAt = Date()
+        byId[sessionId] = session
+        publish()
+    }
+
+    func openChat(sessionId: String, commands: CommandBridge) {
+        commands.focusSession(id: sessionId)
     }
 
     func upsert(_ session: SessionMeta) {
@@ -42,6 +73,12 @@ final class SessionStore {
         if next.createdAt.timeIntervalSince1970 == 0 {
             next.createdAt = previous?.createdAt ?? Date()
         }
+        if next.pending == nil {
+            next.pending = previous?.pending
+        }
+        if next.status != .waitingInput {
+            next.pending = nil
+        }
         byId[session.id] = next
         publish()
         if previous?.status != next.status {
@@ -49,19 +86,21 @@ final class SessionStore {
         }
     }
 
-    private func setStatus(id: String, status: SessionStatus) {
+    private func setStatus(id: String, status: SessionStatus, clearPending: Bool) {
         guard var session = byId[id] else {
-            let skeleton = SessionMeta(
-                id: id,
-                title: id,
-                provider: "unknown",
-                cwd: nil,
-                status: status
+            upsert(
+                SessionMeta(
+                    id: id,
+                    title: id,
+                    provider: "unknown",
+                    cwd: nil,
+                    status: status
+                )
             )
-            upsert(skeleton)
             return
         }
         let previous = session.status
+        if clearPending { session.pending = nil }
         if previous == status {
             session.updatedAt = Date()
             byId[id] = session
@@ -73,6 +112,24 @@ final class SessionStore {
         byId[id] = session
         publish()
         onStatusChange?(session, status, previous)
+    }
+
+    private func setPending(id: String, pending: PendingInteraction) {
+        var session = byId[id] ?? SessionMeta(
+            id: id,
+            title: id,
+            provider: "unknown",
+            status: .waitingInput
+        )
+        let previous = session.status
+        session.pending = pending
+        session.status = .waitingInput
+        session.updatedAt = Date()
+        byId[id] = session
+        publish()
+        if previous != .waitingInput {
+            onStatusChange?(session, .waitingInput, previous)
+        }
     }
 
     private func touch(id: String) {

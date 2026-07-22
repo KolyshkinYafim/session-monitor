@@ -15,6 +15,7 @@
 		A10000000000000000000006 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* SessionStore.swift */; };
 		A10000000000000000000007 /* MockProducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* MockProducer.swift */; };
 		A10000000000000000000008 /* ChatHubBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* ChatHubBridge.swift */; };
+		A10000000000000000000012 /* CommandBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* CommandBridge.swift */; };
 		A10000000000000000000009 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* NotificationService.swift */; };
 		A1000000000000000000000A /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* HotKeyManager.swift */; };
 		A1000000000000000000000B /* VibeIslandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* VibeIslandView.swift */; };
@@ -33,6 +34,7 @@
 		B10000000000000000000006 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* MockProducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockProducer.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* ChatHubBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHubBridge.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* CommandBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBridge.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		B1000000000000000000000A /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
 		B1000000000000000000000B /* VibeIslandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeIslandView.swift; sourceTree = "<group>"; };
@@ -103,6 +105,7 @@
 				B10000000000000000000006 /* SessionStore.swift */,
 				B10000000000000000000007 /* MockProducer.swift */,
 				B10000000000000000000008 /* ChatHubBridge.swift */,
+				B10000000000000000000012 /* CommandBridge.swift */,
 				B10000000000000000000009 /* NotificationService.swift */,
 				B1000000000000000000000A /* HotKeyManager.swift */,
 			);
@@ -197,6 +200,7 @@
 				A10000000000000000000006 /* SessionStore.swift in Sources */,
 				A10000000000000000000007 /* MockProducer.swift in Sources */,
 				A10000000000000000000008 /* ChatHubBridge.swift in Sources */,
+				A10000000000000000000012 /* CommandBridge.swift in Sources */,
 				A10000000000000000000009 /* NotificationService.swift in Sources */,
 				A1000000000000000000000A /* HotKeyManager.swift in Sources */,
 				A1000000000000000000000B /* VibeIslandView.swift in Sources */,

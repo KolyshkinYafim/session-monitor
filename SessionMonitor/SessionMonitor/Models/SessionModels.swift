@@ -8,6 +8,11 @@ enum SessionStatus: String, Codable, Sendable, CaseIterable {
     case done
 }
 
+enum PendingInteraction: Sendable, Equatable {
+    case permission(requestId: String, summary: String)
+    case question(requestId: String, prompt: String, options: [String]?)
+}
+
 struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
     var id: String
     var title: String
@@ -16,6 +21,7 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
     var status: SessionStatus
     var updatedAt: Date
     var createdAt: Date
+    var pending: PendingInteraction?
 
     init(
         id: String,
@@ -24,7 +30,8 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         cwd: String? = nil,
         status: SessionStatus,
         updatedAt: Date = Date(),
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        pending: PendingInteraction? = nil
     ) {
         self.id = id
         self.title = title
@@ -33,6 +40,23 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         self.status = status
         self.updatedAt = updatedAt
         self.createdAt = createdAt
+        self.pending = pending
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, provider, cwd, status, updatedAt, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        provider = try c.decode(String.self, forKey: .provider)
+        cwd = try c.decodeIfPresent(String.self, forKey: .cwd)
+        status = try c.decode(SessionStatus.self, forKey: .status)
+        updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? updatedAt
+        pending = nil
     }
 }
 
@@ -59,6 +83,33 @@ extension SessionStatus {
         case .waitingInput: "waiting"
         case .error: "error"
         case .done: "done"
+        }
+    }
+
+    var isLive: Bool {
+        self == .running || self == .waitingInput || self == .error
+    }
+}
+
+extension PendingInteraction {
+    var promptText: String {
+        switch self {
+        case .permission(_, let summary): summary
+        case .question(_, let prompt, _): prompt
+        }
+    }
+
+    var requestId: String {
+        switch self {
+        case .permission(let id, _): id
+        case .question(let id, _, _): id
+        }
+    }
+
+    var options: [String]? {
+        switch self {
+        case .permission: ["Allow", "Deny"]
+        case .question(_, _, let options): options
         }
     }
 }

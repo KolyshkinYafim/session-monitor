@@ -41,11 +41,12 @@ First launch: allow **notifications** if prompted.
 
 | Action | How |
 |--------|-----|
-| See island | Always under notch / top-center after launch |
-| Expand | Click capsule or **⌘⇧A** |
-| Collapse | Escape, click outside, or ⌘⇧A again |
-| Session actions | Right-click row → copy id / reveal cwd / open Chat Hub (stub) |
-| Quit | Right-click menu bar pill → Quit, or footer Quit |
+| See island | Top-center under menu bar (tucks into “curtain” when idle) |
+| Expand | Click pill or **⌘⇧A** |
+| Collapse / hide | Esc → pill · ↑ button / idle → tuck into menu bar |
+| Open chat | Click a session row (focuses Chat Hub via `commands.jsonl`) |
+| Answer agent | On `waiting`: Allow/Deny chips + text field → Send |
+| Quit | Right-click menu bar control → Quit |
 
 There is **no Dock icon / document window** (`LSUIElement`).
 

@@ -28,7 +28,6 @@ final class AppController {
             }
         }
 
-        // Primary UX: always-on island under notch / top-center.
         panel.start()
         statusItem = StatusItemController(store: store, panel: panel)
 

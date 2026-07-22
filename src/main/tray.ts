@@ -30,9 +30,9 @@ export function createTray(getMainWindow: () => BrowserWindow | null): Tray {
   updateTrayBadge(0)
 
   const show = (): void => {
+    // getMainWindow side-effect expands island (see createTray caller)
     const win = getMainWindow()
     if (!win) return
-    if (win.isMinimized()) win.restore()
     win.show()
     win.focus()
   }
@@ -68,9 +68,7 @@ export function updateTrayBadge(waitingCount: number): void {
     )
   }
 
-  if (process.platform === 'darwin' && app.dock) {
-    app.dock.setBadge(waitingCount > 0 ? String(waitingCount) : '')
-  }
+  // Dock is hidden for ambient island mode — badge stays on tray title only
 }
 
 export function destroyTray(): void {

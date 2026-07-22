@@ -42,6 +42,8 @@ export class ChatHubBridgeAdapter {
   private pollTimer: ReturnType<typeof setInterval> | null = null
   private reading = false
   private stopped = true
+  /** Cold replay has no live Hub process — never restore "running". */
+  private replaying = false
 
   constructor(filePath = agentDesktopEventsPath()) {
     this.filePath = filePath
@@ -67,9 +69,11 @@ export class ChatHubBridgeAdapter {
 
     // Replay existing events without OS notifications, then live-tail.
     sessionRegistry.setSuppressNotify(true)
+    this.replaying = true
     this.offset = 0
     this.buffer = ''
     this.drain()
+    this.replaying = false
     sessionRegistry.setSuppressNotify(false)
 
     try {
@@ -136,8 +140,22 @@ export class ChatHubBridgeAdapter {
       const line = this.buffer.slice(0, idx)
       this.buffer = this.buffer.slice(idx + 1)
       const event = parseSessionEvent(line)
-      if (event) sessionBus.emitEvent(event)
+      if (event) sessionBus.emitEvent(this.normalizeReplay(event))
       idx = this.buffer.indexOf('\n')
     }
+  }
+
+  private normalizeReplay(event: SessionEvent): SessionEvent {
+    if (!this.replaying) return event
+    if (event.type === 'session.status' && event.status === 'running') {
+      return { ...event, status: 'idle' }
+    }
+    if (event.type === 'session.upsert' && event.session.status === 'running') {
+      return {
+        ...event,
+        session: { ...event.session, status: 'idle' }
+      }
+    }
+    return event
   }
 }

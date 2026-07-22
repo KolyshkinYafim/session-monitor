@@ -1,5 +1,6 @@
 import { BrowserWindow, app, ipcMain } from 'electron'
 import { join } from 'node:path'
+import { ChatHubBridgeAdapter } from './adapters/chat-hub-bridge'
 import { MockAdapter } from './adapters/mock'
 import { notifySessionStatus } from './notifications'
 import { sessionRegistry } from './session/registry'
@@ -9,6 +10,7 @@ import type { SessionsSnapshot } from '@shared/types'
 
 let mainWindow: BrowserWindow | null = null
 const mockAdapter = new MockAdapter()
+const chatHubBridge = new ChatHubBridgeAdapter()
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -64,7 +66,9 @@ function broadcast(snapshot: SessionsSnapshot): void {
 
 function registerIpc(): void {
   ipcMain.removeHandler(IpcChannels.getSessions)
+  ipcMain.removeHandler(IpcChannels.getBridgePath)
   ipcMain.handle(IpcChannels.getSessions, () => sessionRegistry.snapshot())
+  ipcMain.handle(IpcChannels.getBridgePath, () => chatHubBridge.path)
 }
 
 app.whenReady().then(() => {
@@ -82,7 +86,11 @@ app.whenReady().then(() => {
 
   mainWindow = createWindow()
   createTray(() => mainWindow)
+
+  // Local mock sessions (works without Chat Hub).
   mockAdapter.start()
+  // Optional Chat Hub JSONL bridge (works without Hub; tails when present).
+  chatHubBridge.start()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -101,6 +109,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   mockAdapter.stop()
+  chatHubBridge.stop()
   sessionRegistry.stop()
   destroyTray()
 })

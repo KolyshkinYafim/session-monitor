@@ -94,6 +94,12 @@ final class SessionStore {
             lastOpenResult = "Demo session (mock) — not in Chat Hub"
             return
         }
+        if let app = session.focusApp {
+            // Terminal (hook) session: bring its host terminal forward directly. No Hub round-trip.
+            let ok = commands.activateApp(bundleIdOrName: app)
+            lastOpenResult = ok ? "Focusing terminal…" : "Terminal (\(app)) not running"
+            return
+        }
         let ok = commands.focusSession(id: sessionId)
         lastOpenResult = ok
             ? "Opening in Chat Hub…"
@@ -112,6 +118,9 @@ final class SessionStore {
         }
         if next.pending == nil {
             next.pending = previous?.pending
+        }
+        if next.focusApp == nil {
+            next.focusApp = previous?.focusApp
         }
         if next.status != .waitingInput {
             next.pending = nil

@@ -22,6 +22,9 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
     var updatedAt: Date
     var createdAt: Date
     var pending: PendingInteraction?
+    /// App to bring forward when this session is opened (bundle id or name). Set by terminal
+    /// hook sessions to the host terminal; `nil` means route through Chat Hub (default).
+    var focusApp: String?
 
     init(
         id: String,
@@ -31,7 +34,8 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         status: SessionStatus,
         updatedAt: Date = Date(),
         createdAt: Date = Date(),
-        pending: PendingInteraction? = nil
+        pending: PendingInteraction? = nil,
+        focusApp: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -41,10 +45,21 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         self.updatedAt = updatedAt
         self.createdAt = createdAt
         self.pending = pending
+        self.focusApp = focusApp
+    }
+
+    /// Sessions that live in a terminal (via the Claude Code hook) rather than in Chat Hub.
+    var isTerminalSession: Bool { focusApp != nil }
+
+    /// Label for the primary "open" action in the island detail pane.
+    var openActionLabel: String {
+        if isMock { return "Demo only" }
+        if isTerminalSession { return "Open terminal" }
+        return "Open in Hub"
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, provider, cwd, status, updatedAt, createdAt
+        case id, title, provider, cwd, status, updatedAt, createdAt, focusApp
     }
 
     init(from decoder: Decoder) throws {
@@ -56,6 +71,7 @@ struct SessionMeta: Identifiable, Codable, Sendable, Equatable {
         status = try c.decode(SessionStatus.self, forKey: .status)
         updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? updatedAt
+        focusApp = try c.decodeIfPresent(String.self, forKey: .focusApp)
         pending = nil
     }
 }

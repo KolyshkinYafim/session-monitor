@@ -34,6 +34,25 @@ final class CommandBridge {
         _ = activateChatHub()
     }
 
+    /// Bring an already-running app forward (e.g. the terminal hosting a Claude hook session).
+    /// Tries bundle id first, then a localized-name match. Returns true if something was activated.
+    @discardableResult
+    func activateApp(bundleIdOrName: String) -> Bool {
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdOrName).first {
+            app.activate(options: [.activateAllWindows])
+            return true
+        }
+        let target = bundleIdOrName.lowercased()
+        for app in NSWorkspace.shared.runningApplications {
+            let name = (app.localizedName ?? "").lowercased()
+            if name == target || name.contains(target) || target.contains(name) && !name.isEmpty {
+                app.activate(options: [.activateAllWindows])
+                return true
+            }
+        }
+        return false
+    }
+
     private func append(_ object: [String: Any]) {
         guard JSONSerialization.isValidJSONObject(object),
               let data = try? JSONSerialization.data(withJSONObject: object),
@@ -62,7 +81,7 @@ final class CommandBridge {
                 || name.localizedCaseInsensitiveContains("Chat Hub")
                 || name == "Electron" && path.localizedCaseInsensitiveContains("agent-desktop-suite")
             if hit {
-                app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+                app.activate(options: [.activateAllWindows])
                 return true
             }
         }
@@ -70,14 +89,14 @@ final class CommandBridge {
         // Bundle id candidates
         for bundleId in ["com.agentdesktop.ChatHub", "com.electron.chat-hub"] {
             if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
-                app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+                app.activate(options: [.activateAllWindows])
                 return true
             }
         }
 
         // Last resort: Electron processes (dev hub)
         for app in apps where app.localizedName == "Electron" {
-            app.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            app.activate(options: [.activateAllWindows])
             return true
         }
         return false

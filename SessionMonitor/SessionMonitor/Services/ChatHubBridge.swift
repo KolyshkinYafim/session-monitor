@@ -174,6 +174,7 @@ final class ChatHubBridge {
         else { return nil }
 
         let cwd = obj["cwd"] as? String
+        let focusApp = obj["focusApp"] as? String
         let updatedAt = date(from: obj["updatedAt"]) ?? Date()
         let createdAt = date(from: obj["createdAt"]) ?? updatedAt
         return SessionMeta(
@@ -183,7 +184,8 @@ final class ChatHubBridge {
             cwd: cwd,
             status: status,
             updatedAt: updatedAt,
-            createdAt: createdAt
+            createdAt: createdAt,
+            focusApp: focusApp
         )
     }
 

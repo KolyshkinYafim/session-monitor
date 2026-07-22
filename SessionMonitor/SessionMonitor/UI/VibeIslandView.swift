@@ -263,8 +263,8 @@ struct VibeIslandView: View {
                     store.openChat(sessionId: session.id, commands: commands)
                 } label: {
                     Label(
-                        session.isMock ? "Demo only" : "Open in Hub",
-                        systemImage: "arrow.up.right.square"
+                        session.openActionLabel,
+                        systemImage: session.isTerminalSession ? "terminal" : "arrow.up.right.square"
                     )
                     .font(.system(size: 10, weight: .semibold))
                 }
@@ -279,7 +279,17 @@ struct VibeIslandView: View {
                     .foregroundStyle(.white.opacity(0.7))
                     .fixedSize(horizontal: false, vertical: true)
 
-                if let options = session.pending?.options, !options.isEmpty {
+                if session.isTerminalSession {
+                    // v1: terminal sessions are monitor-only — reply happens in the terminal.
+                    Button {
+                        store.openChat(sessionId: session.id, commands: commands)
+                    } label: {
+                        Text("Switch to terminal to respond →")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                } else if let options = session.pending?.options, !options.isEmpty {
                     HStack(spacing: 6) {
                         ForEach(options, id: \.self) { option in
                             Button(option) {
@@ -295,6 +305,7 @@ struct VibeIslandView: View {
                     }
                 }
 
+                if !session.isTerminalSession {
                 HStack(spacing: 8) {
                     TextField("Reply…", text: $ui.draftReply)
                         .textFieldStyle(.plain)
@@ -318,6 +329,7 @@ struct VibeIslandView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
                 }
             } else if !session.isMock {
                 Text("Click row or Open in Hub to jump to this chat")

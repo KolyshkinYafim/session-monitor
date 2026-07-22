@@ -2,22 +2,22 @@
 
 > Ambient control surface for AI coding agent sessions (Vibe Island–class).
 
-Two implementations live in this repo:
+A **native macOS** menu-bar "island" HUD (Swift / AppKit + SwiftUI). It tails the Chat Hub
+event bridge and surfaces live agent sessions — statuses, a waiting-input badge, and quick
+reply — as a floating pill at the top-center of the display.
 
-| Surface | Stack | Role |
-|---------|--------|------|
-| **Native island** (recommended) | Swift / SwiftUI · `SessionMonitor/` | Real top-center HUD under menu bar / notch |
-| **Electron MVP** | `src/` · `pnpm dev` | Same product loop for cross-platform iteration |
+> A previous Electron prototype (`src/`) was removed once the native app superseded it — the
+> Swift app under `SessionMonitor/` is the only implementation.
 
 Primary UX is **not** a centered document window and **not** only a tray dropdown.
 
-## Vibe Island (what you want)
+## Vibe Island
 
 - Floating **black capsule** at **top-center** of the Mac display (menu bar / notch zone)
-- Live status dots + waiting badge
-- Click → expand session list; blur / collapse control → pill again
+- Live status dots + waiting badge (real agents only)
+- Click → expand session list; Esc / click-outside / ⌘⇧A → collapse; auto-tucks when idle
 - OS notifications: `waiting_input` / `done` / `error`
-- Sources: mock sessions + **Chat Hub JSONL bridge**
+- Source: **Chat Hub JSONL bridge** (plus an optional local mock producer for UI tests)
 
 ```
                     ┌─────────────────┐
@@ -26,33 +26,32 @@ Primary UX is **not** a centered document window and **not** only a tray dropdow
          ─────────── menu bar / notch ───────────
 ```
 
-## Run — native (recommended on macOS)
+## Run
 
 ```bash
 open SessionMonitor/SessionMonitor.xcodeproj
 ```
 
-Xcode → scheme **SessionMonitor** → **My Mac** → Run (⌘R).
+Xcode → scheme **SessionMonitor** → **My Mac** → Run (⌘R). Hotkey: **⌘⇧A** to expand/collapse.
 
-There is **no Dock document window** (`LSUIElement` style ambient app).
-
-## Run — Electron island MVP
+Or build/run from the CLI:
 
 ```bash
-pnpm install
-pnpm dev
+xcodebuild -project SessionMonitor/SessionMonitor.xcodeproj -scheme SessionMonitor -configuration Debug build
+open ~/Library/Developer/Xcode/DerivedData/SessionMonitor-*/Build/Products/Debug/SessionMonitor.app
 ```
 
-Electron now uses the same **top-center always-on-top pill** (not a 420×560 document window).  
-Dock icon is hidden; tray remains as a secondary expand control.
+There is **no Dock document window** (`LSUIElement`-style ambient app). Enable the local demo
+producer for UI testing with `SESSION_MONITOR_MOCK=1` (off by default).
 
 ## Bridge path
 
 ```
-~/Library/Application Support/agent-desktop/events.jsonl
+~/Library/Application Support/agent-desktop/events.jsonl   (Hub → Monitor)
+~/Library/Application Support/agent-desktop/commands.jsonl  (Monitor → Hub)
 ```
 
-Override: `AGENT_DESKTOP_EVENTS`. See [docs/bridge.md](./docs/bridge.md).
+Override: `AGENT_DESKTOP_EVENTS` / `AGENT_DESKTOP_COMMANDS`. See [docs/bridge.md](./docs/bridge.md).
 
 ## Docs
 
@@ -60,11 +59,11 @@ Override: `AGENT_DESKTOP_EVENTS`. See [docs/bridge.md](./docs/bridge.md).
 - [Architecture](./docs/architecture.md)
 - [Bridge](./docs/bridge.md)
 - [MVP](./docs/mvp.md)
+- [Verification](./docs/VERIFICATION.md)
 
 ## Layout
 
 ```
-SessionMonitor/          Swift native island (Vibe Island class)
-src/                     Electron main/preload/renderer island MVP
+SessionMonitor/          Swift native island (Xcode project — the app)
 docs/
 ```

@@ -26,13 +26,29 @@ final class SessionStore {
         }
     }
 
-    /// Hub / real sessions only (mock demos hidden when real data exists).
+    /// Hub / real sessions only (mock demos hidden when real data exists). Live-preferred:
+    /// when anything is live, show only live; otherwise fall back to the most recent few.
+    /// Used for the glanceable pill dots and as the expanded board's default (`.live`) filter.
     var islandSessions: [SessionMeta] {
-        let real = orderedSessions.filter { !$0.isMock }
-        let source = real.isEmpty ? orderedSessions : real
+        let source = islandSource
         let live = source.filter(\.status.isLive)
         if !live.isEmpty { return live }
         return Array(source.prefix(8))
+    }
+
+    /// Sessions for the expanded board under an explicit filter (`Live` / `All` / `Wait`).
+    func islandSessions(filter: IslandUIState.SessionFilter) -> [SessionMeta] {
+        switch filter {
+        case .live: return islandSessions
+        case .all: return Array(islandSource.prefix(12))
+        case .waiting: return islandSource.filter { $0.status == .waitingInput }
+        }
+    }
+
+    /// Real (non-local-demo) sessions when any exist, otherwise the demos — ordered.
+    private var islandSource: [SessionMeta] {
+        let real = orderedSessions.filter { !$0.isMock }
+        return real.isEmpty ? orderedSessions : real
     }
 
     func apply(_ event: SessionEvent) {

@@ -13,9 +13,17 @@ final class IslandUIState {
         case expanded
     }
 
+    /// Which sessions the expanded board lists. Pill dots always use the live-preferred set.
+    enum SessionFilter: String, CaseIterable {
+        case live = "Live"
+        case all = "All"
+        case waiting = "Wait"
+    }
+
     var mode: Mode = .pill
     var selectedSessionId: String?
     var draftReply: String = ""
+    var filter: SessionFilter = .live
 
     var isExpanded: Bool { mode == .expanded }
 

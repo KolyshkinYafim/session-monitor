@@ -13,7 +13,7 @@ struct VibeIslandView: View {
         switch ui.mode {
         case .tucked: CGSize(width: 120, height: 22)
         case .pill: CGSize(width: store.waitingCount > 0 ? 176 : 148, height: 24)
-        case .expanded: CGSize(width: 392, height: 420)
+        case .expanded: CGSize(width: 392, height: 448)
         }
     }
 
@@ -123,6 +123,7 @@ struct VibeIslandView: View {
         VStack(spacing: 0) {
             dragHandle
             header
+            filterBar
             sessionList
             if let selected = selectedSession {
                 detailPane(selected)
@@ -193,11 +194,34 @@ struct VibeIslandView: View {
         .padding(.bottom, 8)
     }
 
+    private var filterBar: some View {
+        HStack(spacing: 6) {
+            ForEach(IslandUIState.SessionFilter.allCases, id: \.self) { option in
+                Button {
+                    ui.filter = option
+                } label: {
+                    Text(option.rawValue)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(ui.filter == option ? 0.95 : 0.45))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule().fill(Color.white.opacity(ui.filter == option ? 0.14 : 0.05))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
+    }
+
     private var sessionList: some View {
         Group {
-            if store.islandSessions.isEmpty {
+            if filteredSessions.isEmpty {
                 VStack(spacing: 6) {
-                    Text("No agent sessions yet")
+                    Text(emptyTitle)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.7))
                     Text("Start a chat in Chat Hub — it appears here")
@@ -209,7 +233,7 @@ struct VibeIslandView: View {
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 5) {
-                        ForEach(store.islandSessions) { session in
+                        ForEach(filteredSessions) { session in
                             IslandSessionRow(
                                 session: session,
                                 selected: ui.selectedSessionId == session.id
@@ -334,11 +358,23 @@ struct VibeIslandView: View {
         ui.draftReply = ""
     }
 
+    private var filteredSessions: [SessionMeta] {
+        store.islandSessions(filter: ui.filter)
+    }
+
+    private var emptyTitle: String {
+        switch ui.filter {
+        case .waiting: "Nothing waiting on you"
+        case .all: "No agent sessions yet"
+        case .live: "No active sessions"
+        }
+    }
+
     private var selectedSession: SessionMeta? {
         guard let id = ui.selectedSessionId else {
-            return store.islandSessions.first { $0.status == .waitingInput } ?? store.islandSessions.first
+            return filteredSessions.first { $0.status == .waitingInput } ?? filteredSessions.first
         }
-        return store.sessions.first { $0.id == id } ?? store.islandSessions.first
+        return store.sessions.first { $0.id == id } ?? filteredSessions.first
     }
 
     private var collapsedDots: [SessionMeta] { store.islandSessions }

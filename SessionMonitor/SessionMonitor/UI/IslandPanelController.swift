@@ -4,11 +4,15 @@ import SwiftUI
 @MainActor
 final class IslandPanelController: NSObject, NSWindowDelegate {
     private var panel: NSPanel?
+    private var hostingView: NSHostingView<VibeIslandView>?
     private let store: SessionStore
+    private let ui = IslandUIState()
     private let bridgePath: String
     private let onQuit: () -> Void
     private var localMonitor: Any?
     private var globalMonitor: Any?
+    private var screenObserver: NSObjectProtocol?
+    private var currentSize = CGSize(width: 168, height: 36)
 
     init(store: SessionStore, bridgePath: String, onQuit: @escaping () -> Void) {
         self.store = store
@@ -17,143 +21,199 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         super.init()
     }
 
-    var isVisible: Bool {
-        panel?.isVisible == true
-    }
+    var isExpanded: Bool { ui.isExpanded }
 
-    func toggle(relativeTo statusButton: NSStatusBarButton?) {
-        if isVisible {
-            hide()
-        } else {
-            show(relativeTo: statusButton)
+    func start() {
+        let panel = ensurePanel()
+        reposition()
+        panel.orderFrontRegardless()
+        installClickOutsideMonitor()
+        screenObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.reposition() }
         }
     }
 
-    func show(relativeTo statusButton: NSStatusBarButton?) {
-        let panel = ensurePanel()
-        position(panel, relativeTo: statusButton)
-        NSApp.activate(ignoringOtherApps: true)
-        panel.orderFrontRegardless()
-        panel.makeKey()
-        installMonitors()
+    func stop() {
+        if let screenObserver {
+            NotificationCenter.default.removeObserver(screenObserver)
+            self.screenObserver = nil
+        }
+        removeClickOutsideMonitor()
+        panel?.orderOut(nil)
     }
 
-    func hide() {
-        panel?.orderOut(nil)
-        removeMonitors()
+    func toggleExpanded() {
+        if ui.isExpanded {
+            collapse()
+        } else {
+            expand()
+        }
+    }
+
+    func expand() {
+        ui.expand()
+        applySize(animated: true)
+        panel?.makeKey()
+        installKeyMonitor()
+    }
+
+    func collapse() {
+        ui.collapse()
+        applySize(animated: true)
+        removeKeyMonitor()
+    }
+
+    func pulseForWaiting() {
+        if store.waitingCount > 0, !ui.isExpanded {
+            // Keep collapsed but ensure visible on top
+            panel?.orderFrontRegardless()
+        }
     }
 
     private func ensurePanel() -> NSPanel {
         if let panel { return panel }
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 362, height: 422),
+            contentRect: NSRect(x: 0, y: 0, width: currentSize.width, height: currentSize.height),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         panel.isFloatingPanel = true
-        panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
+        panel.collectionBehavior = [
+            .canJoinAllSpaces,
+            .fullScreenAuxiliary,
+            .stationary,
+            .ignoresCycle
+        ]
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.acceptsMouseMovedEvents = true
         panel.delegate = self
-        panel.animationBehavior = .utilityWindow
+        panel.animationBehavior = .none
 
-        let root = SessionListView(
+        let root = VibeIslandView(
             store: store,
+            ui: ui,
             bridgePath: bridgePath,
-            onHide: { [weak self] in self?.hide() },
+            onSizeChange: { [weak self] size in
+                self?.currentSize = size
+                self?.applySize(animated: true)
+            },
             onQuit: onQuit
         )
         let hosting = NSHostingView(rootView: root)
-        hosting.frame = NSRect(x: 0, y: 0, width: 362, height: 422)
+        hosting.frame = NSRect(origin: .zero, size: currentSize)
         panel.contentView = hosting
-
+        self.hostingView = hosting
         self.panel = panel
         return panel
     }
 
-    private func position(_ panel: NSPanel, relativeTo statusButton: NSStatusBarButton?) {
-        let width: CGFloat = 362
-        let height: CGFloat = 422
-        let gap: CGFloat = 6
-
-        if let button = statusButton, let buttonWindow = button.window {
-            let buttonRect = button.convert(button.bounds, to: nil)
-            let screenRect = buttonWindow.convertToScreen(buttonRect)
-            let x = screenRect.midX - width / 2
-            let y = screenRect.minY - height - gap
-            var frame = NSRect(x: x, y: y, width: width, height: height)
-            if let screen = buttonWindow.screen ?? NSScreen.main {
-                frame = clamp(frame, to: screen.visibleFrame, gap: gap)
+    private func applySize(animated: Bool) {
+        guard let panel else { return }
+        let frame = topCenterFrame(size: currentSize)
+        if animated {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.28
+                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().setFrame(frame, display: true)
             }
+        } else {
             panel.setFrame(frame, display: true)
-            return
         }
-
-        guard let screen = NSScreen.main else { return }
-        let visible = screen.visibleFrame
-        // Top-center under menu bar / notch region
-        let x = visible.midX - width / 2
-        let y = visible.maxY - height - gap
-        panel.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
+        hostingView?.frame = NSRect(origin: .zero, size: currentSize)
     }
 
-    private func clamp(_ frame: NSRect, to visible: NSRect, gap: CGFloat) -> NSRect {
-        var f = frame
-        if f.minX < visible.minX + gap {
-            f.origin.x = visible.minX + gap
-        }
-        if f.maxX > visible.maxX - gap {
-            f.origin.x = visible.maxX - gap - f.width
-        }
-        if f.minY < visible.minY + gap {
-            f.origin.y = visible.minY + gap
-        }
-        if f.maxY > visible.maxY - gap {
-            f.origin.y = visible.maxY - gap - f.height
-        }
-        return f
+    private func reposition() {
+        applySize(animated: false)
     }
 
-    private func installMonitors() {
-        removeMonitors()
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
-                self?.hide()
-                return nil
-            }
-            return event
+    /// Pins the island to the physical top-center (notch / menu bar center).
+    private func topCenterFrame(size: CGSize) -> NSRect {
+        guard let screen = NSScreen.main else {
+            return NSRect(origin: .zero, size: size)
         }
+
+        let full = screen.frame
+        // Prefer docking into the top unsafe area (notch / camera housing) when present.
+        let topSafe = screen.safeAreaInsets.top
+        let gapBelowMenu: CGFloat = topSafe > 0 ? 2 : 4
+
+        // On notched Macs, sit just under the status strip; otherwise under menu bar.
+        let topY = full.maxY - gapBelowMenu
+        let x = full.midX - size.width / 2
+        let y = topY - size.height
+        return NSRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    private func installClickOutsideMonitor() {
+        removeClickOutsideMonitor()
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self, self.isVisible, let panel = self.panel else { return }
+            guard let self, self.ui.isExpanded, let panel = self.panel else { return }
             let mouse = NSEvent.mouseLocation
             if !panel.frame.contains(mouse) {
                 DispatchQueue.main.async {
-                    self.hide()
+                    self.collapse()
                 }
             }
         }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, self.ui.isExpanded, let panel = self.panel else { return event }
+            let mouse = NSEvent.mouseLocation
+            if !panel.frame.contains(mouse) {
+                self.collapse()
+            }
+            return event
+        }
     }
 
-    private func removeMonitors() {
-        if let localMonitor {
-            NSEvent.removeMonitor(localMonitor)
-            self.localMonitor = nil
-        }
+    private func removeClickOutsideMonitor() {
         if let globalMonitor {
             NSEvent.removeMonitor(globalMonitor)
             self.globalMonitor = nil
         }
+        if let localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+            // keep local for keys separately - only clear mouse one
+            self.localMonitor = nil
+        }
+    }
+
+    private var keyMonitor: Any?
+
+    private func installKeyMonitor() {
+        removeKeyMonitor()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 {
+                self?.collapse()
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
+        }
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        hide()
+        if ui.isExpanded {
+            collapse()
+        }
     }
 }

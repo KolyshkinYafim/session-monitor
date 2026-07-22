@@ -17,7 +17,8 @@
 		A10000000000000000000008 /* ChatHubBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* ChatHubBridge.swift */; };
 		A10000000000000000000009 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* NotificationService.swift */; };
 		A1000000000000000000000A /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* HotKeyManager.swift */; };
-		A1000000000000000000000B /* SessionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* SessionListView.swift */; };
+		A1000000000000000000000B /* VibeIslandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B /* VibeIslandView.swift */; };
+		A10000000000000000000011 /* IslandUIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* IslandUIState.swift */; };
 		A1000000000000000000000C /* IslandPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* IslandPanelController.swift */; };
 		A1000000000000000000000D /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* StatusItemController.swift */; };
 		A1000000000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* Assets.xcassets */; };
@@ -34,7 +35,8 @@
 		B10000000000000000000008 /* ChatHubBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHubBridge.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		B1000000000000000000000A /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
-		B1000000000000000000000B /* SessionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListView.swift; sourceTree = "<group>"; };
+		B1000000000000000000000B /* VibeIslandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeIslandView.swift; sourceTree = "<group>"; };
+		B10000000000000000000011 /* IslandUIState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandUIState.swift; sourceTree = "<group>"; };
 		B1000000000000000000000C /* IslandPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandPanelController.swift; sourceTree = "<group>"; };
 		B1000000000000000000000D /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		B1000000000000000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -110,7 +112,8 @@
 		E10000000000000000000006 /* UI */ = {
 			isa = PBXGroup;
 			children = (
-				B1000000000000000000000B /* SessionListView.swift */,
+				B1000000000000000000000B /* VibeIslandView.swift */,
+				B10000000000000000000011 /* IslandUIState.swift */,
 				B1000000000000000000000C /* IslandPanelController.swift */,
 				B1000000000000000000000D /* StatusItemController.swift */,
 			);
@@ -196,7 +199,8 @@
 				A10000000000000000000008 /* ChatHubBridge.swift in Sources */,
 				A10000000000000000000009 /* NotificationService.swift in Sources */,
 				A1000000000000000000000A /* HotKeyManager.swift in Sources */,
-				A1000000000000000000000B /* SessionListView.swift in Sources */,
+				A1000000000000000000000B /* VibeIslandView.swift in Sources */,
+				A10000000000000000000011 /* IslandUIState.swift in Sources */,
 				A1000000000000000000000C /* IslandPanelController.swift in Sources */,
 				A1000000000000000000000D /* StatusItemController.swift in Sources */,
 			);

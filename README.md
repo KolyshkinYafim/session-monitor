@@ -7,11 +7,11 @@ Not a chat app. Not a centered document window. Not Electron.
 
 ## What it is
 
-- Menu bar icon with **waiting_input** badge count
-- Compact **island panel** under the menu bar / top-center (notch region)
-- Hides on **blur**, outside click, or **Escape**
-- Global hotkey **⌘⇧A** to toggle
+- **Vibe Island–style HUD** always floating under the notch / top-center (not a tray dropdown)
+- Collapsed **black capsule** with live status dots + waiting badge
+- Click / **⌘⇧A** → expands into session list; Escape / outside click → collapses (island stays)
 - OS notifications on `waiting_input` / `done` / `error`
+- Optional tiny menu-bar control for Quit; primary UX is the island
 - Sources: **mock sessions** + **Chat Hub JSONL bridge**
 
 ## Open & run
@@ -41,13 +41,13 @@ First launch: allow **notifications** if prompted.
 
 | Action | How |
 |--------|-----|
-| Open panel | Click menu bar icon |
-| Toggle panel | **⌘⇧A** |
-| Hide panel | Escape, click outside, or blur |
-| Session actions | Right-click row → copy id / reveal cwd / activate stub |
-| Quit | Right-click menu bar icon → Quit, or Quit in panel footer |
+| See island | Always under notch / top-center after launch |
+| Expand | Click capsule or **⌘⇧A** |
+| Collapse | Escape, click outside, or ⌘⇧A again |
+| Session actions | Right-click row → copy id / reveal cwd / open Chat Hub (stub) |
+| Quit | Right-click menu bar pill → Quit, or footer Quit |
 
-There is **no main window** on launch (`LSUIElement`).
+There is **no Dock icon / document window** (`LSUIElement`).
 
 ## Bridge path
 

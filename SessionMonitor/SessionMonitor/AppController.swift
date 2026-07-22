@@ -12,10 +12,6 @@ final class AppController {
 
     func start() {
         notifications.requestAuthorization()
-        store.setStatusChangeHandler { [weak self] session, status, previous in
-            self?.notifications.notifyIfNeeded(session: session, status: status, previous: previous)
-            self?.statusItem?.updateBadge()
-        }
 
         let panel = IslandPanelController(
             store: store,
@@ -23,6 +19,17 @@ final class AppController {
             onQuit: { NSApp.terminate(nil) }
         )
         self.panel = panel
+
+        store.setStatusChangeHandler { [weak self] session, status, previous in
+            self?.notifications.notifyIfNeeded(session: session, status: status, previous: previous)
+            self?.statusItem?.updateBadge()
+            if status == .waitingInput {
+                self?.panel?.pulseForWaiting()
+            }
+        }
+
+        // Primary UX: always-on island under notch / top-center.
+        panel.start()
         statusItem = StatusItemController(store: store, panel: panel)
 
         let mock = MockProducer(store: store)
@@ -34,8 +41,7 @@ final class AppController {
         self.bridge = bridge
 
         hotKey.register { [weak self] in
-            guard let self else { return }
-            self.panel?.toggle(relativeTo: self.statusItem?.button)
+            self?.panel?.toggleExpanded()
         }
     }
 
@@ -43,6 +49,6 @@ final class AppController {
         hotKey.unregister()
         mock?.stop()
         bridge?.stop()
-        panel?.hide()
+        panel?.stop()
     }
 }

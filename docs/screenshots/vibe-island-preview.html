@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Session Monitor — Vibe Island</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0a0b0f;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    color: #fff;
+    overflow: hidden;
+  }
+  .wallpaper {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(900px 400px at 50% 0%, #1c2438 0%, transparent 55%),
+      linear-gradient(180deg, #12151c 0%, #07080c 100%);
+  }
+  .menubar {
+    position: fixed; top: 0; left: 0; right: 0; height: 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 14px; font-size: 12px; color: #d7dbe5;
+    background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(20px);
+    z-index: 2;
+  }
+  .notch {
+    position: fixed; top: 0; left: 50%; transform: translateX(-50%);
+    width: 148px; height: 28px; background: #000; border-radius: 0 0 16px 16px;
+    z-index: 3;
+  }
+  .stage { position: relative; z-index: 4; padding-top: 34px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+  .pill {
+    height: 36px; min-width: 168px; padding: 0 14px;
+    border-radius: 20px; background: #000; display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .pill .ico { color: #ff9f0a; font-size: 12px; }
+  .dots { display: flex; }
+  .dots span { width: 8px; height: 8px; border-radius: 50%; margin-left: -3px; border: 1px solid rgba(0,0,0,0.5); }
+  .dots .g { background: #30d158; }
+  .dots .o { background: #ff9f0a; }
+  .dots .b { background: #64d2ff; }
+  .count { background: #ff9f0a; color: #111; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 6px; }
+  .expanded {
+    width: 380px; border-radius: 26px; background: rgba(0,0,0,0.94);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.6), 0 0 24px rgba(255,159,10,0.12);
+    overflow: hidden;
+  }
+  .eh { padding: 16px 14px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
+  .eh small { color: #ff9f0a; font-weight: 600; margin-left: 8px; font-size: 10px; }
+  .row { margin: 0 10px 6px; padding: 10px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.05); display: flex; gap: 10px; align-items: center; }
+  .row.w { border-color: rgba(255,159,10,0.4); background: rgba(255,255,255,0.08); }
+  .av { width: 28px; height: 28px; border-radius: 50%; display:grid; place-items:center; font-size: 11px; }
+  .av.o { background: rgba(255,159,10,0.18); color: #ff9f0a; }
+  .av.g { background: rgba(48,209,88,0.18); color: #30d158; }
+  .t { flex: 1; min-width: 0; }
+  .t .title { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t .meta { font-size: 10.5px; color: rgba(255,255,255,0.4); margin-top: 3px; }
+  .t .meta b { color: #73d1ff; font-weight: 500; }
+  .st { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 4px 7px; border-radius: 999px; }
+  .st.w { color: #ff9f0a; background: rgba(255,159,10,0.14); }
+  .st.r { color: #30d158; background: rgba(48,209,88,0.14); }
+  .cap { color: rgba(255,255,255,0.4); font-size: 12px; text-align: center; max-width: 420px; line-height: 1.5; }
+  .cap strong { color: rgba(255,255,255,0.85); }
+</style>
+</head>
+<body>
+  <div class="wallpaper"></div>
+  <div class="menubar"><span> Session Monitor</span><span>Mon 3:00</span></div>
+  <div class="notch"></div>
+  <div class="stage">
+    <div class="pill">
+      <span class="ico">●</span>
+      <div class="dots"><span class="o"></span><span class="g"></span><span class="b"></span></div>
+      <span class="count">1</span>
+    </div>
+    <div class="expanded">
+      <div class="eh"><div>Sessions <small>1 need input</small></div><div style="opacity:.7">3</div></div>
+      <div class="row w">
+        <div class="av o">C</div>
+        <div class="t">
+          <div class="title">Fix flaky e2e suite</div>
+          <div class="meta"><b>Claude</b> · …/projects/web · 4s</div>
+        </div>
+        <div class="st w">waiting</div>
+      </div>
+      <div class="row">
+        <div class="av g">G</div>
+        <div class="t">
+          <div class="title">Refactor auth middleware</div>
+          <div class="meta"><b>Grok</b> · …/projects/api · 12s</div>
+        </div>
+        <div class="st r">running</div>
+      </div>
+      <div class="row">
+        <div class="av g">X</div>
+        <div class="t">
+          <div class="title">Add session metrics</div>
+          <div class="meta"><b>Codex</b> · …/monitor · 8s</div>
+        </div>
+        <div class="st r">running</div>
+      </div>
+      <div style="padding:10px 14px; font-size:9px; color:rgba(255,255,255,.35); font-family: ui-monospace, monospace;">
+        ~/Library/Application Support/agent-desktop/events.jsonl
+      </div>
+    </div>
+    <div class="cap">
+      <strong>Always-on island under the notch</strong> — not a tray popup.<br/>
+      Click pill / ⌘⇧A to expand · Escape or click outside to collapse
+    </div>
+  </div>
+</body>
+</html>

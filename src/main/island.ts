@@ -77,11 +77,12 @@ export function createIslandWindow(): BrowserWindow {
 export function positionIsland(win: BrowserWindow, mode: IslandMode): void {
   const size = mode === 'expanded' ? ISLAND_EXPANDED : ISLAND_COLLAPSED
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-  // Use full bounds (not workArea) so we sit in the menu-bar / notch strip
+  // Full display bounds (not workArea) — anchor in the menu-bar / notch strip,
+  // same class as Vibe Island (top-center "curtain"), not a document window.
   const { x: dx, y: dy, width: dw } = display.bounds
   const x = Math.round(dx + (dw - size.width) / 2)
-  // Just under the top edge — like Vibe Island under the Dynamic Island / menubar
-  const y = Math.round(dy + (process.platform === 'darwin' ? 8 : 4))
+  // Flush to the top bezel; pill hangs under the status area / Dynamic Island.
+  const y = Math.round(dy + (process.platform === 'darwin' ? 0 : 2))
 
   win.setBounds({ x, y, width: size.width, height: size.height }, false)
 }

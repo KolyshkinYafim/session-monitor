@@ -1,54 +1,50 @@
 # Session Monitor
 
-> Ambient menu-bar control surface for AI coding agent sessions (Vibe Island–class).
+> Ambient control surface for AI coding agent sessions (Vibe Island–class).
 
-**Native macOS 14+** · Swift · SwiftUI + AppKit panel  
-Not a chat app. Not a centered document window. Not Electron.
+Two implementations live in this repo:
 
-## What it is
+| Surface | Stack | Role |
+|---------|--------|------|
+| **Native island** (recommended) | Swift / SwiftUI · `SessionMonitor/` | Real top-center HUD under menu bar / notch |
+| **Electron MVP** | `src/` · `pnpm dev` | Same product loop for cross-platform iteration |
 
-- **Vibe Island–style HUD** always floating under the notch / top-center (not a tray dropdown)
-- Collapsed **black capsule** with live status dots + waiting badge
-- Click / **⌘⇧A** → expands into session list; Escape / outside click → collapses (island stays)
-- OS notifications on `waiting_input` / `done` / `error`
-- Optional tiny menu-bar control for Quit; primary UX is the island
-- Sources: **mock sessions** + **Chat Hub JSONL bridge**
+Primary UX is **not** a centered document window and **not** only a tray dropdown.
 
-## Open & run
+## Vibe Island (what you want)
+
+- Floating **black capsule** at **top-center** of the Mac display (menu bar / notch zone)
+- Live status dots + waiting badge
+- Click → expand session list; blur / collapse control → pill again
+- OS notifications: `waiting_input` / `done` / `error`
+- Sources: mock sessions + **Chat Hub JSONL bridge**
+
+```
+                    ┌─────────────────┐
+                    │ ● ●  1  Waiting │  ← island pill (always on top)
+                    └─────────────────┘
+         ─────────── menu bar / notch ───────────
+```
+
+## Run — native (recommended on macOS)
 
 ```bash
 open SessionMonitor/SessionMonitor.xcodeproj
 ```
 
-In Xcode:
+Xcode → scheme **SessionMonitor** → **My Mac** → Run (⌘R).
 
-1. Select scheme **SessionMonitor**
-2. Destination: **My Mac**
-3. Run (⌘R)
+There is **no Dock document window** (`LSUIElement` style ambient app).
 
-Or from terminal:
+## Run — Electron island MVP
 
 ```bash
-cd SessionMonitor
-xcodebuild -scheme SessionMonitor -configuration Debug build
-# then open the built .app from DerivedData, or:
-open ~/Library/Developer/Xcode/DerivedData/SessionMonitor-*/Build/Products/Debug/SessionMonitor.app
+pnpm install
+pnpm dev
 ```
 
-First launch: allow **notifications** if prompted.
-
-## Usage
-
-| Action | How |
-|--------|-----|
-| See island | Top-center under menu bar (tucks into “curtain” when idle) |
-| Expand | Click pill or **⌘⇧A** |
-| Collapse / hide | Esc → pill · ↑ button / idle → tuck into menu bar |
-| Open chat | Click a session row (focuses Chat Hub via `commands.jsonl`) |
-| Answer agent | On `waiting`: Allow/Deny chips + text field → Send |
-| Quit | Right-click menu bar control → Quit |
-
-There is **no Dock icon / document window** (`LSUIElement`).
+Electron now uses the same **top-center always-on-top pill** (not a 420×560 document window).  
+Dock icon is hidden; tray remains as a secondary expand control.
 
 ## Bridge path
 
@@ -56,35 +52,19 @@ There is **no Dock icon / document window** (`LSUIElement`).
 ~/Library/Application Support/agent-desktop/events.jsonl
 ```
 
-Same path as Chat Hub. Override with `AGENT_DESKTOP_EVENTS`.
-
-Details: [docs/bridge.md](./docs/bridge.md)
+Override: `AGENT_DESKTOP_EVENTS`. See [docs/bridge.md](./docs/bridge.md).
 
 ## Docs
 
 - [Product](./docs/product.md)
 - [Architecture](./docs/architecture.md)
 - [Bridge](./docs/bridge.md)
+- [MVP](./docs/mvp.md)
 
-## Project layout
+## Layout
 
 ```
-SessionMonitor/
-  SessionMonitor.xcodeproj
-  SessionMonitor/
-    Models/          SessionStatus, SessionMeta, events
-    Services/        store, mock, bridge, notifs, hotkey
-    UI/              status item, island panel, list
-    AppDelegate.swift
+SessionMonitor/          Swift native island (Vibe Island class)
+src/                     Electron main/preload/renderer island MVP
+docs/
 ```
-
-## Legacy Electron scaffold
-
-Older Electron files may still exist under `src/` / `package.json` from an earlier experiment. **Canonical product is the native Xcode app** in `SessionMonitor/`.
-
-## Next (real adapters)
-
-- Claude / Grok / Codex / OpenCode producers writing the same JSONL (or dedicated watchers)
-- Permission / question action UI
-- Jump to Chat Hub session or terminal
-- Optional true Dynamic Island private API / HUD polish

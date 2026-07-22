@@ -29,6 +29,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     private let store: SessionStore
     private let ui = IslandUIState()
     private let commands = CommandBridge()
+    private let prefs: Preferences
     private let bridgePath: String
     private let onQuit: () -> Void
     private var globalMonitor: Any?
@@ -37,11 +38,17 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     private var currentSize = CGSize(width: 168, height: 24)
     private var autoTuckTimer: Timer?
 
-    init(store: SessionStore, bridgePath: String, onQuit: @escaping () -> Void) {
+    init(store: SessionStore, prefs: Preferences, bridgePath: String, onQuit: @escaping () -> Void) {
         self.store = store
+        self.prefs = prefs
         self.bridgePath = bridgePath
         self.onQuit = onQuit
         super.init()
+    }
+
+    /// Re-dock after a preference change (chosen display / width).
+    func applyPreferences() {
+        reposition()
     }
 
     var isExpanded: Bool { ui.isExpanded }
@@ -140,6 +147,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         let root = VibeIslandView(
             store: store,
             ui: ui,
+            prefs: prefs,
             commands: commands,
             bridgePath: bridgePath,
             onSizeChange: { [weak self] size in
@@ -215,10 +223,15 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     }
 
     private func dockingScreen() -> NSScreen? {
-        // Always dock to the primary display — the one that owns the global origin (0,0) and the
-        // menu bar. We deliberately do NOT follow the mouse: that made the island jump between
-        // displays and pushed it off-screen (X≈-949) on a monitor positioned left of the primary.
         let screens = NSScreen.screens
+        // Honor the user's chosen display if it's still connected.
+        if let wanted = prefs.screenName,
+           let match = screens.first(where: { $0.localizedName == wanted }) {
+            return match
+        }
+        // Default: the primary display — the one that owns the global origin (0,0) and the menu
+        // bar. We deliberately do NOT follow the mouse: that made the island jump between displays
+        // and pushed it off-screen (X≈-949) on a monitor positioned left of the primary.
         let primary = screens.first { $0.frame.origin == .zero }
         return primary ?? NSScreen.main ?? screens.first
     }

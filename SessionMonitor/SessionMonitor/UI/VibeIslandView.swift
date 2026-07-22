@@ -4,16 +4,21 @@ import SwiftUI
 struct VibeIslandView: View {
     @Bindable var store: SessionStore
     @Bindable var ui: IslandUIState
+    @Bindable var prefs: Preferences
     var commands: CommandBridge
     var bridgePath: String
     var onSizeChange: (CGSize) -> Void
     var onQuit: () -> Void
 
     private var currentSize: CGSize {
+        let scale = prefs.widthStyle.scale
         switch ui.mode {
-        case .tucked: CGSize(width: 120, height: 22)
-        case .pill: CGSize(width: store.waitingCount > 0 ? 176 : 148, height: 24)
-        case .expanded: CGSize(width: 392, height: 448)
+        case .tucked:
+            return CGSize(width: 120, height: 22)
+        case .pill:
+            return CGSize(width: ((store.waitingCount > 0 ? 176 : 148) * scale).rounded(), height: 24)
+        case .expanded:
+            return CGSize(width: (392 * scale).rounded(), height: 448)
         }
     }
 
@@ -32,6 +37,7 @@ struct VibeIslandView: View {
         .animation(.spring(response: 0.36, dampingFraction: 0.86), value: ui.mode)
         .onAppear { onSizeChange(currentSize) }
         .onChange(of: ui.mode) { _, _ in onSizeChange(currentSize) }
+        .onChange(of: prefs.widthStyle) { _, _ in onSizeChange(currentSize) }
         .onChange(of: store.waitingCount) { _, count in
             if count > 0, ui.mode == .tucked {
                 ui.mode = .pill

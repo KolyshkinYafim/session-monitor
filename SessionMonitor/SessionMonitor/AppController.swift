@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 final class AppController {
     let store = SessionStore()
+    private let prefs = Preferences()
     private let notifications = NotificationService()
     private var mock: MockProducer?
     private var bridge: ChatHubBridge?
@@ -15,6 +16,7 @@ final class AppController {
 
         let panel = IslandPanelController(
             store: store,
+            prefs: prefs,
             bridgePath: BridgePath.displayPath,
             onQuit: { NSApp.terminate(nil) }
         )
@@ -36,7 +38,7 @@ final class AppController {
         }
 
         panel.start()
-        statusItem = StatusItemController(store: store, panel: panel)
+        statusItem = StatusItemController(store: store, panel: panel, prefs: prefs)
 
         // Mock only when explicitly enabled — otherwise badge jumps 1/2 randomly.
         let mockEnabled =

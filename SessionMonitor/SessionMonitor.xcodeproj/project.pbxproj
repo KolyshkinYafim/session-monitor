@@ -12,6 +12,7 @@
 		A10000000000000000000003 /* AppController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* AppController.swift */; };
 		A10000000000000000000004 /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SessionModels.swift */; };
 		A10000000000000000000005 /* BridgePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* BridgePath.swift */; };
+		A10000000000000000000013 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* Preferences.swift */; };
 		A10000000000000000000006 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* SessionStore.swift */; };
 		A10000000000000000000007 /* MockProducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* MockProducer.swift */; };
 		A10000000000000000000008 /* ChatHubBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* ChatHubBridge.swift */; };
@@ -31,6 +32,7 @@
 		B10000000000000000000003 /* AppController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppController.swift; sourceTree = "<group>"; };
 		B10000000000000000000004 /* SessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModels.swift; sourceTree = "<group>"; };
 		B10000000000000000000005 /* BridgePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgePath.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* MockProducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockProducer.swift; sourceTree = "<group>"; };
 		B10000000000000000000008 /* ChatHubBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatHubBridge.swift; sourceTree = "<group>"; };
@@ -102,6 +104,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000005 /* BridgePath.swift */,
+				B10000000000000000000013 /* Preferences.swift */,
 				B10000000000000000000006 /* SessionStore.swift */,
 				B10000000000000000000007 /* MockProducer.swift */,
 				B10000000000000000000008 /* ChatHubBridge.swift */,
@@ -197,6 +200,7 @@
 				A10000000000000000000003 /* AppController.swift in Sources */,
 				A10000000000000000000004 /* SessionModels.swift in Sources */,
 				A10000000000000000000005 /* BridgePath.swift in Sources */,
+				A10000000000000000000013 /* Preferences.swift in Sources */,
 				A10000000000000000000006 /* SessionStore.swift in Sources */,
 				A10000000000000000000007 /* MockProducer.swift in Sources */,
 				A10000000000000000000008 /* ChatHubBridge.swift in Sources */,

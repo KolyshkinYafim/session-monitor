@@ -25,8 +25,17 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
+  })
+
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', (event, url) => {
+    const allowed =
+      process.env.ELECTRON_RENDERER_URL != null
+        ? url.startsWith(process.env.ELECTRON_RENDERER_URL)
+        : url.startsWith('file://')
+    if (!allowed) event.preventDefault()
   })
 
   win.on('ready-to-show', () => {
@@ -53,23 +62,27 @@ function broadcast(snapshot: SessionsSnapshot): void {
   }
 }
 
+function registerIpc(): void {
+  ipcMain.removeHandler(IpcChannels.getSessions)
+  ipcMain.handle(IpcChannels.getSessions, () => sessionRegistry.snapshot())
+}
+
 app.whenReady().then(() => {
+  registerIpc()
+
   sessionRegistry.start({
     onNotify: (session, status) => {
       notifySessionStatus(session, status)
     }
   })
 
-  mainWindow = createWindow()
-  createTray(() => mainWindow)
-
   sessionRegistry.subscribe((snapshot) => {
     broadcast(snapshot)
   })
 
+  mainWindow = createWindow()
+  createTray(() => mainWindow)
   mockAdapter.start()
-
-  ipcMain.handle(IpcChannels.getSessions, () => sessionRegistry.snapshot())
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

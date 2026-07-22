@@ -190,14 +190,31 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
 
     private func installClickOutsideMonitor() {
         removeClickOutsideMonitor()
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self, self.ui.mode == .expanded, let panel = self.panel else { return }
-            let mouse = NSEvent.mouseLocation
-            if !panel.frame.contains(mouse) {
-                DispatchQueue.main.async {
-                    self.collapse()
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [
+            .leftMouseDown,
+            .rightMouseDown,
+            .keyDown
+        ]) { [weak self] event in
+            guard let self else { return }
+            if event.type == .keyDown, event.keyCode == 53, self.ui.mode == .expanded {
+                DispatchQueue.main.async { self.collapse() }
+                return
+            }
+            guard self.ui.mode == .expanded, let panel = self.panel else { return }
+            if event.type == .leftMouseDown || event.type == .rightMouseDown {
+                let mouse = NSEvent.mouseLocation
+                if !panel.frame.contains(mouse) {
+                    DispatchQueue.main.async { self.collapse() }
                 }
             }
+        }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            if event.keyCode == 53, self.ui.mode == .expanded {
+                self.collapse()
+                return nil
+            }
+            return event
         }
     }
 
@@ -206,33 +223,18 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
             NSEvent.removeMonitor(globalMonitor)
             self.globalMonitor = nil
         }
-    }
-
-    private func syncKeyMonitor() {
-        if ui.mode == .expanded {
-            installKeyMonitor()
-        } else {
-            removeKeyMonitor()
-        }
-    }
-
-    private func installKeyMonitor() {
-        removeKeyMonitor()
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 {
-                self?.collapse()
-                return nil
-            }
-            return event
-        }
-    }
-
-    private func removeKeyMonitor() {
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
             self.keyMonitor = nil
         }
     }
+
+    private func syncKeyMonitor() {
+        // Key + outside click monitors stay installed for the app lifetime.
+    }
+
+    private func installKeyMonitor() {}
+    private func removeKeyMonitor() {}
 
     func windowDidResignKey(_ notification: Notification) {
         if ui.mode == .expanded {

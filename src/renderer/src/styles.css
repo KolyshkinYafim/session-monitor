@@ -215,3 +215,23 @@ body {
 .empty span {
   font-size: 12px;
 }
+
+.bridge-footer {
+  border-top: 1px solid var(--border);
+  padding: 8px 12px 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bridge-footer code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: #a8b3c7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -12,15 +12,23 @@ export class SessionRegistry {
   private onNotify: ((session: SessionMeta, status: SessionStatus) => void) | null = null
   private persistTimer: ReturnType<typeof setTimeout> | null = null
   private unsubBus: (() => void) | null = null
+  private suppressNotify = false
 
   start(options?: {
     onNotify?: (session: SessionMeta, status: SessionStatus) => void
   }): void {
     this.onNotify = options?.onNotify ?? null
     for (const session of loadSessions()) {
-      this.sessions.set(session.id, session)
+      // Never restore as stuck running without a live process.
+      const status: SessionStatus =
+        session.status === 'running' ? 'idle' : session.status
+      this.sessions.set(session.id, { ...session, status })
     }
     this.unsubBus = sessionBus.onEvent((event) => this.handleEvent(event))
+  }
+
+  setSuppressNotify(value: boolean): void {
+    this.suppressNotify = value
   }
 
   stop(): void {
@@ -114,6 +122,7 @@ export class SessionRegistry {
     status: SessionStatus,
     prevStatus?: SessionStatus
   ): void {
+    if (this.suppressNotify) return
     if (prevStatus === status) return
     if (!NOTIFY_STATUSES.includes(status)) return
     this.onNotify?.(session, status)

@@ -46,9 +46,27 @@ pnpm typecheck
 - Session list UI (title, provider, cwd, status, duration)
 - `SessionEvent` bus in main process
 - Mock adapter cycling: `running` → `waiting_input` → `running` → `done` (then restarts)
+- **Chat Hub bridge**: tails shared JSONL and shows Hub sessions
 - OS notifications on `waiting_input` / `done` / `error`
 - Tray title + dock badge = count of `waiting_input`
 - Session meta persisted to `userData/sessions.json`
+
+## Chat Hub bridge
+
+Shared append-only event log (same path as Chat Hub):
+
+```
+~/Library/Application Support/agent-desktop/events.jsonl
+```
+
+| Side | Role |
+|------|------|
+| Chat Hub | Produces `SessionEvent` lines |
+| Session Monitor | Replays + tails; merges into session list |
+
+Details: [docs/bridge.md](./docs/bridge.md). Override with `AGENT_DESKTOP_EVENTS`.
+
+Both apps stay usable alone (mock sessions without Hub; Hub still writes without Monitor).
 
 ## Project layout
 
@@ -57,11 +75,11 @@ src/
   main/           Electron main (tray, bus, registry, adapters)
   preload/        contextBridge API
   renderer/       React UI
-  shared/         SessionEvent types + IPC channels
+  shared/         SessionEvent types + IPC channels + bridge path
 ```
 
 ## Next
 
-- One real adapter (Grok hooks, OpenCode, or Chat Hub bridge)
+- Real CLI adapters (Grok / OpenCode) alongside the Hub bridge
 - Permission / question action UI
 - Jump to terminal or Chat Hub session

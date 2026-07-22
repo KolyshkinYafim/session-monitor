@@ -6,10 +6,12 @@ const empty: SessionsSnapshot = { sessions: [], waitingCount: 0 }
 
 export function App(): React.JSX.Element {
   const [snapshot, setSnapshot] = useState<SessionsSnapshot>(empty)
+  const [bridgePath, setBridgePath] = useState('')
 
   useEffect(() => {
     let unsub: (() => void) | undefined
     void window.sessionMonitor.getSessions().then(setSnapshot)
+    void window.sessionMonitor.getBridgePath().then(setBridgePath)
     unsub = window.sessionMonitor.onSessionsUpdated(setSnapshot)
     return () => unsub?.()
   }, [])
@@ -29,6 +31,12 @@ export function App(): React.JSX.Element {
         </div>
       </header>
       <SessionList sessions={snapshot.sessions} />
+      {bridgePath ? (
+        <footer className="bridge-footer" title={bridgePath}>
+          <span>Chat Hub bridge</span>
+          <code>{bridgePath}</code>
+        </footer>
+      ) : null}
     </div>
   )
 }

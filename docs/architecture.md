@@ -44,7 +44,9 @@ Monitor **consumes** events. Chat Hub (and CLIs) **produce** them.
 
 MVP options (prefer simple):
 
-1. **Chat Hub bridge** — local socket/file IPC from Hub
+1. **Chat Hub bridge** — shared JSONL at  
+   `~/Library/Application Support/agent-desktop/events.jsonl`  
+   (see [bridge.md](./bridge.md))
 2. **Filesystem hooks** — watch known agent log/state dirs
 3. **Process scan** — optional, unreliable; secondary
 

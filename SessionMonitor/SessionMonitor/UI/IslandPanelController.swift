@@ -14,7 +14,7 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     private var globalMonitor: Any?
     private var keyMonitor: Any?
     private var screenObserver: NSObjectProtocol?
-    private var currentSize = CGSize(width: 158, height: 34)
+    private var currentSize = CGSize(width: 168, height: 24)
     private var autoTuckTimer: Timer?
 
     init(store: SessionStore, bridgePath: String, onQuit: @escaping () -> Void) {
@@ -48,7 +48,6 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
             self.screenObserver = nil
         }
         removeClickOutsideMonitor()
-        removeKeyMonitor()
         panel?.orderOut(nil)
     }
 
@@ -59,7 +58,6 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
             ui.expand()
         }
         applySize(animated: true)
-        syncKeyMonitor()
         scheduleAutoTuck()
     }
 
@@ -67,21 +65,18 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
         ui.expand()
         applySize(animated: true)
         panel?.makeKey()
-        syncKeyMonitor()
         scheduleAutoTuck()
     }
 
     func collapse() {
         ui.collapseToPill()
         applySize(animated: true)
-        syncKeyMonitor()
         scheduleAutoTuck()
     }
 
     func tuck() {
         ui.tuck()
         applySize(animated: true)
-        syncKeyMonitor()
     }
 
     func pulseForWaiting() {
@@ -103,8 +98,8 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
             defer: false
         )
         panel.isFloatingPanel = true
-        // Sit with menu bar chrome (curtain), above normal windows.
-        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) - 1)
+        // Must be ≥ status/menu level or macOS clamps the frame under the menu bar.
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
         panel.collectionBehavior = [
             .canJoinAllSpaces,
             .fullScreenAuxiliary,
@@ -146,41 +141,63 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
     private func applySize(animated: Bool) {
         guard let panel else { return }
         let frame = topCenterFrame(size: currentSize)
+        // Keep level high every resize — some macOS builds demote panels.
+        panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.statusWindow)) + 1)
         if animated {
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.32
+                ctx.duration = 0.28
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(frame, display: true)
+            } completionHandler: { [weak self] in
+                self?.forceFlushTop()
             }
         } else {
             panel.setFrame(frame, display: true)
+            forceFlushTop()
         }
         hostingView?.frame = NSRect(origin: .zero, size: currentSize)
-        syncKeyMonitor()
+        panel.orderFrontRegardless()
+    }
+
+    /// Re-assert top-edge flush if the system nudged the frame.
+    private func forceFlushTop() {
+        guard let panel, let screen = dockingScreen() else { return }
+        let full = screen.frame
+        var frame = panel.frame
+        let targetY = full.maxY - frame.height
+        if abs(frame.maxY - full.maxY) > 0.5 || abs(frame.origin.y - targetY) > 0.5 {
+            frame.origin.y = targetY
+            frame.origin.x = full.midX - frame.width / 2
+            panel.setFrame(frame, display: true)
+        }
     }
 
     private func reposition() {
         applySize(animated: false)
     }
 
-    /// Flush to the top edge so collapse feels like sliding into the menu-bar curtain.
+    /// Absolute top-center of the physical display (menu-bar / notch band).
     private func topCenterFrame(size: CGSize) -> NSRect {
-        guard let screen = NSScreen.main else {
+        guard let screen = dockingScreen() else {
             return NSRect(origin: .zero, size: size)
         }
         let full = screen.frame
-        // 0 gap = tucked into top “curtain”; tiny offset only if needed for click targets.
-        let topInset: CGFloat = ui.mode == .tucked ? 0 : 0
+        // Top edge of window == top edge of screen. Zero gap.
         let x = full.midX - size.width / 2
-        let y = full.maxY - size.height - topInset
+        let y = full.maxY - size.height
         return NSRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    private func dockingScreen() -> NSScreen? {
+        // Prefer screen under the mouse; fallback main.
+        let mouse = NSEvent.mouseLocation
+        return NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
     }
 
     private func scheduleAutoTuck() {
         autoTuckTimer?.invalidate()
-        // Only auto-tuck when idle (no waiting) and not expanded.
         guard store.waitingCount == 0, ui.mode == .pill else { return }
-        autoTuckTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in
+        autoTuckTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.store.waitingCount == 0, self.ui.mode == .pill else { return }
                 self.tuck()
@@ -228,13 +245,6 @@ final class IslandPanelController: NSObject, NSWindowDelegate {
             self.keyMonitor = nil
         }
     }
-
-    private func syncKeyMonitor() {
-        // Key + outside click monitors stay installed for the app lifetime.
-    }
-
-    private func installKeyMonitor() {}
-    private func removeKeyMonitor() {}
 
     func windowDidResignKey(_ notification: Notification) {
         if ui.mode == .expanded {

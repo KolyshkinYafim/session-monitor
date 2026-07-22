@@ -11,9 +11,10 @@ struct VibeIslandView: View {
 
     private var currentSize: CGSize {
         switch ui.mode {
-        case .tucked: CGSize(width: 126, height: 28)
-        case .pill: CGSize(width: store.waitingCount > 0 ? 196 : 158, height: 34)
-        case .expanded: CGSize(width: 392, height: 420)
+        // Heights match menu-bar strip so the pill sits in the top “curtain”.
+        case .tucked: CGSize(width: 120, height: 22)
+        case .pill: CGSize(width: store.waitingCount > 0 ? 188 : 152, height: 24)
+        case .expanded: CGSize(width: 392, height: 400)
         }
     }
 
@@ -63,7 +64,7 @@ struct VibeIslandView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(CurtainShell(topRadius: 0, bottomRadius: 14, waiting: store.waitingCount > 0))
+            .background(CurtainShell(topRadius: 0, bottomRadius: 10, waiting: store.waitingCount > 0))
         }
         .buttonStyle(.plain)
         .help("Session Monitor — click to show")
@@ -102,9 +103,10 @@ struct VibeIslandView: View {
                         .foregroundStyle(.white.opacity(0.82))
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(CurtainShell(topRadius: 0, bottomRadius: 18, waiting: store.waitingCount > 0))
+            // Flat top (flush to screen edge), rounded bottom only.
+            .background(CurtainShell(topRadius: 0, bottomRadius: 12, waiting: store.waitingCount > 0))
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -128,12 +130,12 @@ struct VibeIslandView: View {
             }
             footer
         }
-        .background(CurtainShell(topRadius: 0, bottomRadius: 24, waiting: store.waitingCount > 0))
+        .background(CurtainShell(topRadius: 0, bottomRadius: 22, waiting: store.waitingCount > 0))
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 24,
+                bottomLeadingRadius: 22,
+                bottomTrailingRadius: 22,
                 topTrailingRadius: 0,
                 style: .continuous
             )
@@ -495,7 +497,9 @@ private struct CurtainShell: View {
                 shape.stroke(Color.orange.opacity(0.35), lineWidth: 1)
             }
         }
-        .shadow(color: .black.opacity(0.45), radius: 16, y: 10)
-        .shadow(color: waiting ? Color.orange.opacity(0.22) : .clear, radius: 12, y: 0)
+        // Soft drop only below — not a free-floating card in the middle of the desktop.
+        .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
+        .shadow(color: waiting ? Color.orange.opacity(0.2) : .clear, radius: 10, y: 2)
     }
 }
+

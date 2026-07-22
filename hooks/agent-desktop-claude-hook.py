@@ -142,6 +142,24 @@ def build_events(data):
     return []
 
 
+def maybe_trim(path):
+    """Keep the append-only bridge from growing forever. Cheap size check first; only when it
+    crosses ~1.5 MB do we rewrite it atomically to the last N lines (recent sessions survive;
+    Chat Hub re-publishes its live ones anyway)."""
+    try:
+        if os.path.getsize(path) < 1_500_000:
+            return
+        with open(path, encoding="utf-8") as f:
+            lines = f.readlines()
+        tail = lines[-1500:]
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.writelines(tail)
+        os.replace(tmp, path)  # atomic
+    except Exception:
+        pass
+
+
 def main():
     raw = sys.stdin.read()
     data = json.loads(raw) if raw.strip() else {}
@@ -153,6 +171,7 @@ def main():
     with open(path, "a", encoding="utf-8") as f:
         for obj in events:
             f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    maybe_trim(path)
 
 
 if __name__ == "__main__":

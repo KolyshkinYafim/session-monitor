@@ -11,7 +11,7 @@ Not another chat shell. This is a **monitor**:
 - list of live agent sessions
 - statuses: `idle` | `running` | `waiting_input` | `error` | `done`
 - OS notifications + tray badge (waiting_input count)
-- multi-provider via adapters (mock today; real adapters next)
+- multi-provider via adapters (mock + Chat Hub bridge; more next)
 
 Spiritually close to Vibe Island / Claude Peek — but tray + compact window first, not a notch-only clone.
 
@@ -78,8 +78,14 @@ src/
   shared/         SessionEvent types + IPC channels + bridge path
 ```
 
+## Reliability notes
+
+- Live statuses (`running` / `waiting_input`) are demoted to `idle` on cold start
+- `running` with no bus events for 5 minutes becomes `error` (stale)
+- Permission/question payloads are kept on session meta for a future act UI
+
 ## Next
 
 - Real CLI adapters (Grok / OpenCode) alongside the Hub bridge
-- Permission / question action UI
+- Permission / question action UI (allow/deny answers)
 - Jump to terminal or Chat Hub session

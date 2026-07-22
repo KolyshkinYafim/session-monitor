@@ -12,9 +12,8 @@ const statusLabel: Record<SessionStatus, string> = {
   done: 'done'
 }
 
-function formatDuration(updatedAt: number, createdAt: number): string {
-  const ms = Math.max(0, updatedAt - createdAt)
-  const sec = Math.floor(ms / 1000)
+function formatDuration(ms: number): string {
+  const sec = Math.floor(Math.max(0, ms) / 1000)
   if (sec < 60) return `${sec}s`
   const min = Math.floor(sec / 60)
   if (min < 60) return `${min}m`
@@ -23,12 +22,22 @@ function formatDuration(updatedAt: number, createdAt: number): string {
 }
 
 function shortPath(cwd: string): string {
+  if (!cwd) return '—'
   const parts = cwd.split('/').filter(Boolean)
   if (parts.length <= 2) return cwd
   return `…/${parts.slice(-2).join('/')}`
 }
 
+function pendingText(session: SessionMeta): string | null {
+  if (!session.pending) return null
+  if (session.pending.kind === 'permission') return session.pending.summary
+  return session.pending.prompt
+}
+
 export function SessionRow({ session }: Props): React.JSX.Element {
+  const sinceStatus = Date.now() - (session.statusChangedAt || session.updatedAt)
+  const pending = pendingText(session)
+
   return (
     <li className={`session-row status-${session.status}`}>
       <div className="session-main">
@@ -41,14 +50,19 @@ export function SessionRow({ session }: Props): React.JSX.Element {
         <div className="session-meta">
           <span className="provider">{session.provider}</span>
           <span className="dot">·</span>
-          <span className="cwd" title={session.cwd}>
+          <span className="cwd" title={session.cwd || undefined}>
             {shortPath(session.cwd)}
           </span>
           <span className="dot">·</span>
-          <span className="duration">
-            {formatDuration(session.updatedAt, session.createdAt)}
+          <span className="duration" title="Time in current status">
+            {formatDuration(sinceStatus)}
           </span>
         </div>
+        {pending ? (
+          <p className="session-pending" title={pending}>
+            {pending}
+          </p>
+        ) : null}
       </div>
     </li>
   )

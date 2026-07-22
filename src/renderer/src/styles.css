@@ -194,6 +194,15 @@ body {
   white-space: nowrap;
 }
 
+.session-pending {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--waiting);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty {
   flex: 1;
   display: flex;

@@ -1,5 +1,9 @@
 export type SessionStatus = 'idle' | 'running' | 'waiting_input' | 'error' | 'done'
 
+export type PendingInteraction =
+  | { kind: 'permission'; requestId: string; summary: string }
+  | { kind: 'question'; requestId: string; prompt: string; options?: string[] }
+
 export type SessionMeta = {
   id: string
   title: string
@@ -8,6 +12,11 @@ export type SessionMeta = {
   status: SessionStatus
   updatedAt: number
   createdAt: number
+  /** Last bus event time (liveness). */
+  lastEventAt: number
+  /** When status last changed (UI duration). */
+  statusChangedAt: number
+  pending?: PendingInteraction | null
 }
 
 export type SessionEvent =

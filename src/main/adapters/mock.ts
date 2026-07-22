@@ -1,5 +1,6 @@
 import type { SessionMeta, SessionStatus } from '@shared/types'
 import { sessionBus } from '../session/bus'
+import type { SessionAdapter } from './types'
 
 const CYCLE: SessionStatus[] = ['running', 'waiting_input', 'running', 'done']
 const CYCLE_MS = 4000
@@ -36,7 +37,8 @@ const SEEDS: MockSessionSeed[] = [
   }
 ]
 
-export class MockAdapter {
+export class MockAdapter implements SessionAdapter {
+  readonly id = 'mock'
   private timers: ReturnType<typeof setInterval>[] = []
   private phases = new Map<string, number>()
 
@@ -53,7 +55,10 @@ export class MockAdapter {
         cwd: seed.cwd,
         status,
         createdAt: now - seed.phaseOffset * 60_000,
-        updatedAt: now
+        updatedAt: now,
+        lastEventAt: now,
+        statusChangedAt: now,
+        pending: null
       }
       sessionBus.emitEvent({ type: 'session.upsert', session })
     }

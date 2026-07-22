@@ -163,9 +163,20 @@ Shared requirements before any real adapter:
 
 ---
 
-## 8) Implemented in this pass
+## 8) Implemented
 
+### Pass 1 (P0)
 - P0-1 IPC bootstrap order  
 - P0-2 Hydrate demotion + basic validation  
 - P0-3 `sandbox: true`  
-- Small related: deny window open / external navigation (cheap hardening next to P0 window setup)
+- Deny window open / external navigation  
+
+### Pass 2 (top P1)
+- P1-1 `SessionAdapter` + `AdapterHost` (`src/main/adapters/types.ts`)  
+- P1-2 Path allowlist (`src/main/security/paths.ts`) used by Chat Hub bridge  
+- P1-3 Pending permission/question stored on `SessionMeta.pending`  
+- P1-4 Auto-skeleton session on status/permission/question for unknown ids  
+- P1-5 Stale `running` → `error` after 5m without bus events  
+- P1-6 Stronger store + bridge event validation  
+- P1-8 Chat Hub JSONL bridge wired via host  
+- P2-1 Duration = time in current status (`statusChangedAt`)  

@@ -10,31 +10,130 @@ import {
   type FSWatcher
 } from 'node:fs'
 import { dirname } from 'node:path'
-import type { SessionEvent } from '@shared/types'
+import type { SessionEvent, SessionMeta, SessionStatus } from '@shared/types'
 import { agentDesktopEventsPath } from '@shared/bridge-path'
+import { isAllowedWatchPath } from '../security/paths'
 import { sessionBus } from '../session/bus'
 import { sessionRegistry } from '../session/registry'
+import type { SessionAdapter } from './types'
 
 const POLL_MS = 750
+const STATUSES = new Set<SessionStatus>([
+  'idle',
+  'running',
+  'waiting_input',
+  'error',
+  'done'
+])
+
+function isSessionMeta(value: unknown): value is SessionMeta {
+  if (!value || typeof value !== 'object') return false
+  const s = value as Partial<SessionMeta>
+  return (
+    typeof s.id === 'string' &&
+    s.id.length > 0 &&
+    typeof s.title === 'string' &&
+    typeof s.provider === 'string' &&
+    typeof s.cwd === 'string' &&
+    typeof s.status === 'string' &&
+    STATUSES.has(s.status as SessionStatus) &&
+    typeof s.updatedAt === 'number' &&
+    typeof s.createdAt === 'number'
+  )
+}
 
 function parseSessionEvent(line: string): SessionEvent | null {
   const trimmed = line.trim()
   if (!trimmed) return null
   try {
-    const obj = JSON.parse(trimmed) as { type?: string }
-    if (!obj || typeof obj.type !== 'string') return null
-    if (!obj.type.startsWith('session.')) return null
-    return obj as SessionEvent
+    const obj = JSON.parse(trimmed) as Record<string, unknown>
+    if (!obj || typeof obj.type !== 'string' || !obj.type.startsWith('session.')) {
+      return null
+    }
+
+    switch (obj.type) {
+      case 'session.upsert': {
+        if (!isSessionMeta(obj.session)) return null
+        const raw = obj.session
+        const now = Date.now()
+        const session: SessionMeta = {
+          ...raw,
+          lastEventAt: typeof raw.lastEventAt === 'number' ? raw.lastEventAt : now,
+          statusChangedAt:
+            typeof raw.statusChangedAt === 'number' ? raw.statusChangedAt : now,
+          pending: raw.pending ?? null
+        }
+        return { type: 'session.upsert', session }
+      }
+      case 'session.status':
+        if (typeof obj.id !== 'string' || !STATUSES.has(obj.status as SessionStatus)) {
+          return null
+        }
+        return { type: 'session.status', id: obj.id, status: obj.status as SessionStatus }
+      case 'session.permission':
+        if (
+          typeof obj.id !== 'string' ||
+          typeof obj.requestId !== 'string' ||
+          typeof obj.summary !== 'string'
+        ) {
+          return null
+        }
+        return {
+          type: 'session.permission',
+          id: obj.id,
+          requestId: obj.requestId,
+          summary: obj.summary
+        }
+      case 'session.question':
+        if (
+          typeof obj.id !== 'string' ||
+          typeof obj.requestId !== 'string' ||
+          typeof obj.prompt !== 'string'
+        ) {
+          return null
+        }
+        return {
+          type: 'session.question',
+          id: obj.id,
+          requestId: obj.requestId,
+          prompt: obj.prompt,
+          options: Array.isArray(obj.options)
+            ? obj.options.filter((o): o is string => typeof o === 'string')
+            : undefined
+        }
+      case 'session.message':
+        if (
+          typeof obj.id !== 'string' ||
+          (obj.role !== 'user' && obj.role !== 'assistant' && obj.role !== 'system') ||
+          typeof obj.preview !== 'string'
+        ) {
+          return null
+        }
+        return {
+          type: 'session.message',
+          id: obj.id,
+          role: obj.role,
+          preview: obj.preview
+        }
+      case 'session.ended':
+        if (
+          typeof obj.id !== 'string' ||
+          (obj.reason !== 'done' && obj.reason !== 'error' && obj.reason !== 'killed')
+        ) {
+          return null
+        }
+        return { type: 'session.ended', id: obj.id, reason: obj.reason }
+      default:
+        return null
+    }
   } catch {
     return null
   }
 }
 
-/**
- * Tails Chat Hub's append-only SessionEvent JSONL.
- * Safe if Hub is not running (empty/missing file).
- */
-export class ChatHubBridgeAdapter {
+/** Tails Chat Hub's append-only SessionEvent JSONL. Safe if Hub is absent. */
+export class ChatHubBridgeAdapter implements SessionAdapter {
+  readonly id = 'chat-hub-bridge'
   private readonly filePath: string
   private offset = 0
   private buffer = ''
@@ -42,7 +141,6 @@ export class ChatHubBridgeAdapter {
   private pollTimer: ReturnType<typeof setInterval> | null = null
   private reading = false
   private stopped = true
-  /** Cold replay has no live Hub process — never restore "running". */
   private replaying = false
 
   constructor(filePath = agentDesktopEventsPath()) {
@@ -55,6 +153,12 @@ export class ChatHubBridgeAdapter {
 
   start(): void {
     if (!this.stopped) return
+
+    if (!isAllowedWatchPath(this.filePath)) {
+      console.error('[chat-hub-bridge] path not allowlisted:', this.filePath)
+      return
+    }
+
     this.stopped = false
 
     try {
@@ -64,10 +168,10 @@ export class ChatHubBridgeAdapter {
       }
     } catch (err) {
       console.error('[chat-hub-bridge] ensure file failed', err)
+      this.stopped = true
       return
     }
 
-    // Replay existing events without OS notifications, then live-tail.
     sessionRegistry.setSuppressNotify(true)
     this.replaying = true
     this.offset = 0
@@ -110,7 +214,6 @@ export class ChatHubBridgeAdapter {
 
       const size = statSync(this.filePath).size
       if (size < this.offset) {
-        // Truncated / rotated
         this.offset = 0
         this.buffer = ''
       }
@@ -150,11 +253,20 @@ export class ChatHubBridgeAdapter {
     if (event.type === 'session.status' && event.status === 'running') {
       return { ...event, status: 'idle' }
     }
-    if (event.type === 'session.upsert' && event.session.status === 'running') {
+    if (event.type === 'session.status' && event.status === 'waiting_input') {
+      return { ...event, status: 'idle' }
+    }
+    if (
+      event.type === 'session.upsert' &&
+      (event.session.status === 'running' || event.session.status === 'waiting_input')
+    ) {
       return {
         ...event,
-        session: { ...event.session, status: 'idle' }
+        session: { ...event.session, status: 'idle', pending: null }
       }
+    }
+    if (event.type === 'session.permission' || event.type === 'session.question') {
+      return { type: 'session.status', id: event.id, status: 'idle' }
     }
     return event
   }

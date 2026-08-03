@@ -11,19 +11,22 @@ reply — as a floating pill at the top-center of the display.
 
 Primary UX is **not** a centered document window and **not** only a tray dropdown.
 
-## Vibe Island
+## Vibe Island (notch-native)
 
-- Floating **black capsule** at **top-center** of the Mac display (menu bar / notch zone)
-- Live status dots + waiting badge (real agents only)
-- Click → expand session list; Esc / click-outside / ⌘⇧A → collapse; auto-tucks when idle
+Sits **in** the menu-bar / notch band (like Vibe Island), not as a ghost pill under the curtain:
+
+- **Compact / activity strip** — height = menu bar; **left wing** = live session icons, **center** = hardware notch (empty), **right wing** = waiting badge / live count
+- **Expanded** — board drops **down** from the strip; list content is below the notch (never clipped under it)
+- Modes: `compact` → `activity` → `expanded` (no invisible 4px tuck)
+- Click strip / ⌘⇧A → expand; Esc / click-outside → collapse; idle 10s → compact (still visible)
 - OS notifications: `waiting_input` / `done` / `error`
-- Source: **Chat Hub JSONL bridge** (plus an optional local mock producer for UI tests)
+- Source: **Chat Hub JSONL bridge** (+ optional `SESSION_MONITOR_MOCK=1`)
 
 ```
-                    ┌─────────────────┐
-                    │ ● ●  1  Waiting │  ← island pill (always on top)
-                    └─────────────────┘
-         ─────────── menu bar / notch ───────────
+  [icons] ████ NOTCH ████ [badge]     ← strip in menu bar band
+           ┌──────────────────┐
+           │ Sessions board   │       ← expands downward only
+           └──────────────────┘
 ```
 
 ## Run

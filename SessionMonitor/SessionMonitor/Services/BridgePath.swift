@@ -24,7 +24,21 @@ enum BridgePath {
         return agentDesktopDir.appendingPathComponent("commands.jsonl", isDirectory: false)
     }
 
+    /// Bidirectional unix socket for blocking hooks (PermissionRequest).
+    /// Override: `AGENT_DESKTOP_SOCKET`.
+    static var socketFile: URL {
+        if let override = ProcessInfo.processInfo.environment["AGENT_DESKTOP_SOCKET"],
+           !override.isEmpty {
+            return URL(fileURLWithPath: override)
+        }
+        return agentDesktopDir.appendingPathComponent("monitor.sock", isDirectory: false)
+    }
+
     static var displayPath: String {
         eventsFile.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+    }
+
+    static var socketDisplayPath: String {
+        socketFile.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 }

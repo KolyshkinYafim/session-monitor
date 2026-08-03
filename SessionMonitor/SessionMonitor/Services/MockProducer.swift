@@ -30,9 +30,12 @@ final class MockProducer {
                         title: seed.title,
                         provider: seed.provider,
                         cwd: seed.cwd,
+                        model: seed.provider == "claude" ? "sonnet" : (seed.provider == "grok" ? "grok-3" : "default"),
                         status: cycle[phase],
                         updatedAt: now,
-                        createdAt: created
+                        createdAt: created,
+                        lastActivity: "Working…",
+                        source: .mock
                     )
                 )
             )

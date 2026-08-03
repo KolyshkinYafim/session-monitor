@@ -1,4 +1,8 @@
 import AppKit
+// ApplicationServices' AX* globals (e.g. kAXTrustedCheckOptionPrompt) aren't annotated
+// Sendable, so a plain import trips "not concurrency-safe" under this project's
+// SWIFT_STRICT_CONCURRENCY=complete. @preconcurrency defers those checks to Apple.
+@preconcurrency import ApplicationServices
 import Darwin
 
 /// Whoever holds this lock owns `monitor.sock`. A second copy (a Debug build launched
@@ -74,6 +78,7 @@ final class AppController {
 
     func start() {
         notifications.requestAuthorization()
+        requestAccessibilityIfNeeded()
 
         let panel = IslandPanelController(
             store: store,
@@ -155,6 +160,17 @@ final class AppController {
         hotKey.register { [weak self] in
             self?.panel?.toggleExpanded()
         }
+    }
+
+    /// The global Esc collapse (IslandPanelController's click-outside monitor) and the
+    /// Cmd+Shift+A hotkey both rely on macOS having granted Accessibility. Without ever
+    /// calling the prompting variant, macOS never shows the request — the feature just
+    /// silently does nothing on a fresh install. Safe to call every launch: once granted
+    /// or denied, the prompt option is a no-op (Settings › Privacy & Security is the only
+    /// way to change it after the first decision).
+    private func requestAccessibilityIfNeeded() {
+        let options: [String: Any] = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
 
     func stop() {

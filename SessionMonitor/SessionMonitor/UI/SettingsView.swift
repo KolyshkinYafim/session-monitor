@@ -1,5 +1,8 @@
 import AppKit
-import ApplicationServices
+// ApplicationServices' AX* globals (e.g. kAXTrustedCheckOptionPrompt) aren't annotated
+// Sendable, so a plain import trips "not concurrency-safe" under this project's
+// SWIFT_STRICT_CONCURRENCY=complete. @preconcurrency defers those checks to Apple.
+@preconcurrency import ApplicationServices
 import Darwin
 import SwiftUI
 import UniformTypeIdentifiers
@@ -614,19 +617,34 @@ struct SettingsView: View {
                 Divider()
                 shortcutRow("Menu bar", keys: "Click icon · right-click for menu")
             }
-            Text(
-                escWorksGlobally
-                    ? "Esc collapses the island from any app."
-                    : "Esc only reaches the island while it is focused — grant Accessibility in System Settings › Privacy & Security to catch it from any app."
-            )
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
+            groupBox("Accessibility") {
+                integrationRow(
+                    escWorksGlobally ? "Accessibility: Granted" : "Accessibility: Not granted",
+                    detail: escWorksGlobally
+                        ? "Global Esc and the click-outside collapse are active from any app."
+                        : "Global Esc won't fire outside the island until this is granted.",
+                    ok: escWorksGlobally
+                )
+                if !escWorksGlobally {
+                    Button("Open System Settings › Privacy & Security › Accessibility") {
+                        openAccessibilitySettings()
+                    }
+                }
+            }
         }
     }
 
     /// A global key monitor gets nothing without the Accessibility grant, so the Esc row
-    /// above is a half-truth until it is given.
-    private var escWorksGlobally: Bool { AXIsProcessTrusted() }
+    /// above is a half-truth until it is given. Query-only (no prompt) — the prompting
+    /// call lives in AppController.requestAccessibilityIfNeeded() at startup.
+    private var escWorksGlobally: Bool {
+        AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary)
+    }
+
+    private func openAccessibilitySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return }
+        NSWorkspace.shared.open(url)
+    }
 
     // MARK: SSH
 

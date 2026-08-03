@@ -23,17 +23,66 @@ wrapper_for() {  # wrapper_for <source>
     "$HOOK" "$PY" "$HOOK" "$1"
 }
 
+# Detects the one rival we know how to safely disarm — Vibe Island's blocking
+# PermissionRequest hook — by the same command substring the write step matches on.
+# Read-only; an unparseable/missing config just reads as "not present" here, the write
+# step below still runs its own parse check and bails loudly if the file is truly broken.
+vibe_island_rival_present() {  # vibe_island_rival_present <settings.json>
+  "$PY" - "$1" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        raw = f.read()
+    data = json.loads(raw) if raw.strip() else {}
+except Exception:
+    sys.exit(1)
+if not isinstance(data, dict):
+    sys.exit(1)
+hooks = data.get("hooks")
+groups = hooks.get("PermissionRequest", []) if isinstance(hooks, dict) else []
+if not isinstance(groups, list):
+    sys.exit(1)
+for g in groups:
+    if not isinstance(g, dict):
+        continue
+    for h in g.get("hooks", []):
+        if isinstance(h, dict) and "vibe-island" in str(h.get("command") or ""):
+            sys.exit(0)
+sys.exit(1)
+PYEOF
+}
+
 install_into() {  # install_into <settings.json> <source-name> <events csv> <blocking: yes|no>
   local settings="$1" source="$2" events="$3" blocking="$4"
-  local dir backup cmd
+  local dir backup cmd strip_rival="no"
   dir="$(dirname "$settings")"
   mkdir -p "$dir"
   [ -f "$settings" ] || echo '{}' > "$settings"
+
+  # Two blocking PermissionRequest hooks race: the CLI takes whichever decision arrives
+  # first and aborts the loser, so both islands prompt and one answer is thrown away.
+  # Offer to disable the known rival when we can actually ask someone (a TTY) — this
+  # script is run by hand per the README, never piped into unattended.
+  if [ "$blocking" = "yes" ] && vibe_island_rival_present "$settings"; then
+    if [ -t 0 ]; then
+      echo "! $source ($settings): a blocking Vibe Island hook (vibe-island-bridge) is already registered for PermissionRequest."
+      echo "  Both it and this island would prompt for every permission — first answer wins, the other hangs."
+      printf "  Disable Vibe Island's hook here so only Agent Desktop prompts? [y/N] "
+      read -r reply || reply=""
+      case "$reply" in
+        [Yy]*) strip_rival="yes"; echo "  -> disabling Vibe Island's PermissionRequest hook in $settings" ;;
+        *)     echo "  -> leaving both hooks in place — pick one manually so they stop racing" ;;
+      esac
+    fi
+    # No TTY: fall through unchanged — the write step below still prints its existing
+    # "another blocking PermissionRequest hook" warning and leaves both hooks in place.
+  fi
+
   backup="$settings.backup-$(date +%Y%m%d-%H%M%S)"
   cp "$settings" "$backup"
   cmd="$(wrapper_for "$source")"
 
-  if ! AD_EVENTS="$events" AD_BLOCKING="$blocking" "$PY" - "$settings" "$cmd" <<'PYEOF'
+  if ! AD_EVENTS="$events" AD_BLOCKING="$blocking" AD_STRIP_RIVAL="$strip_rival" "$PY" - "$settings" "$cmd" <<'PYEOF'
 import json, os, sys
 settings_path, cmd = sys.argv[1], sys.argv[2]
 try:
@@ -72,6 +121,19 @@ def is_ours(group):
             return True
     return False
 
+# The one rival install_into's interactive prompt already offered to disarm — matched by
+# the same command substring vibe_island_rival_present() detected it with.
+def is_vibe_island(group):
+    if not isinstance(group, dict):
+        return False
+    for h in group.get("hooks", []):
+        if isinstance(h, dict) and "vibe-island" in str(h.get("command") or ""):
+            return True
+    return False
+
+# Set only when the user answered yes to the interactive prompt above.
+strip_rival = os.environ.get("AD_STRIP_RIVAL") == "yes"
+
 # Fire-and-forget events for this CLI (they don't all support the same set).
 fast_events = [e for e in os.environ.get("AD_EVENTS", "").split(",") if e]
 # Blocking permission — long timeout so the island can wait for the user.
@@ -82,6 +144,8 @@ def put(ev, timeout=None):
     if not isinstance(arr, list):
         arr = []
     arr = [g for g in arr if not is_ours(g)]
+    if strip_rival and ev == "PermissionRequest":
+        arr = [g for g in arr if not is_vibe_island(g)]
     entry = {"hooks": [{"type": "command", "command": cmd}]}
     if timeout is not None:
         entry["hooks"][0]["timeout"] = timeout
@@ -94,6 +158,8 @@ def put(ev, timeout=None):
 # and aborts the loser, so both islands prompt and one of the answers is thrown away.
 if slow_events:
     rival = [g for g in (hooks.get("PermissionRequest") or []) if not is_ours(g)]
+    if strip_rival:
+        rival = [g for g in rival if not is_vibe_island(g)]
     if rival:
         print("! another blocking PermissionRequest hook is registered here — both it and "
               "the island will prompt, and the first answer wins", file=sys.stderr)

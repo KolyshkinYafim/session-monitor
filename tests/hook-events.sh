@@ -164,6 +164,73 @@ PY
 [ $? -eq 0 ] && pass "unrelated settings and Vibe Island's hook survive" || fail "install.sh dropped foreign settings or hooks"
 
 echo
+echo "=== install.sh offers to disable Vibe Island's hook under a real TTY, and strips it on yes ==="
+# The two checks above cover install.sh with no controlling terminal (this test script's own
+# stdin isn't a tty), which is the "warn and continue" branch. The offer-to-disable branch
+# only runs behind `[ -t 0 ]`, so exercising it needs an actual pseudo-terminal — spawn one
+# with Python's pty module and answer the prompt once it appears.
+cat > "$FAKE/.claude/settings.json" <<'JSON'
+{
+  "model": "opus",
+  "hooks": {
+    "PermissionRequest": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "vibe-island-bridge --source claude", "timeout": 86400 }] }
+    ]
+  }
+}
+JSON
+HOME="$FAKE" /usr/bin/python3 - "$HOOKS_DIR/install.sh" >"$TMP/install3.log" 2>&1 <<'PY'
+import os, pty, select, sys, time
+script = sys.argv[1]
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp("bash", ["bash", script])
+    os._exit(1)
+os.set_blocking(fd, False)
+out = bytearray()
+sent = False
+deadline = time.time() + 15
+while time.time() < deadline:
+    r, _, _ = select.select([fd], [], [], 0.2)
+    if r:
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        out += chunk
+        if not sent and b"[y/N]" in out:
+            os.write(fd, b"y\n")
+            sent = True
+    wpid, _ = os.waitpid(pid, os.WNOHANG)
+    if wpid == pid:
+        try:
+            while True:
+                r2, _, _ = select.select([fd], [], [], 0.1)
+                if not r2:
+                    break
+                chunk = os.read(fd, 65536)
+                if not chunk:
+                    break
+                out += chunk
+        except OSError:
+            pass
+        break
+sys.stdout.buffer.write(bytes(out))
+PY
+grep -q "Disable Vibe Island's hook here" "$TMP/install3.log" && pass "prompts to disable Vibe Island under a real TTY" || fail "no interactive prompt appeared under a TTY"
+/usr/bin/python3 - "$FAKE/.claude/settings.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+groups = d.get("hooks", {}).get("PermissionRequest", [])
+cmds = [h.get("command", "") for g in groups for h in g.get("hooks", [])]
+ok = not any("vibe-island" in c for c in cmds) and any("agent-desktop-claude-hook" in c for c in cmds)
+sys.exit(0 if ok else 1)
+PY
+[ $? -eq 0 ] && pass "answering yes strips Vibe Island's hook and keeps ours" || fail "Vibe Island's hook survived (or ours was dropped) after answering yes"
+
+echo
 if [ "$FAILED" -eq 0 ]; then
   echo "✓ all checks passed"
 else

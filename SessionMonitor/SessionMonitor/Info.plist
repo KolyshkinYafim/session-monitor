@@ -15,9 +15,12 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- The git identity is NOT here: Xcode processes this file into the bundle after every
+	     build phase has run, so a script phase stamping the built Info.plist is overwritten.
+	     packaging/stamp-build-identity.sh writes Resources/BuildIdentity.plist instead. -->
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>

@@ -7,9 +7,13 @@ set -euo pipefail
 PLIST_DST="$HOME/Library/LaunchAgents/com.agentdesktop.SessionMonitor.plist"
 DST="/Applications/SessionMonitor.app"
 
+# Legacy: older installs autostarted through a LaunchAgent instead of the app's login item.
 launchctl unload "$PLIST_DST" 2>/dev/null || true
 rm -f "$PLIST_DST"
 pkill -f "SessionMonitor.app/Contents/MacOS/SessionMonitor" 2>/dev/null || true
 rm -rf "$DST"
+# The login item belongs to a bundle that no longer exists; drop the preference too so a
+# later reinstall does not silently re-register it.
+defaults delete com.agentdesktop.SessionMonitor general.launchAtLogin 2>/dev/null || true
 echo "✓ Uninstalled SessionMonitor and disabled launch at login."
 echo "  (The Claude Code hook is separate — remove it with hooks/uninstall.sh if you want.)"

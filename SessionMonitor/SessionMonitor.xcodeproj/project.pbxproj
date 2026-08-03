@@ -23,7 +23,14 @@
 		A10000000000000000000011 /* IslandUIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* IslandUIState.swift */; };
 		A1000000000000000000000C /* IslandPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000C /* IslandPanelController.swift */; };
 		A1000000000000000000000D /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* StatusItemController.swift */; };
+		A10000000000000000000014 /* IslandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* IslandTheme.swift */; };
+		A10000000000000000000015 /* IslandGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* IslandGeometry.swift */; };
+		A10000000000000000000016 /* MonitorSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016 /* MonitorSocketServer.swift */; };
+		A10000000000000000000017 /* IslandSounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* IslandSounds.swift */; };
+		A10000000000000000000018 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* SettingsView.swift */; };
+		A10000000000000000000019 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* SettingsWindowController.swift */; };
 		A1000000000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* Assets.xcassets */; };
+		A1000000000000000000001A /* hooks in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* hooks */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,9 +50,16 @@
 		B10000000000000000000011 /* IslandUIState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandUIState.swift; sourceTree = "<group>"; };
 		B1000000000000000000000C /* IslandPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandPanelController.swift; sourceTree = "<group>"; };
 		B1000000000000000000000D /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
+		B10000000000000000000014 /* IslandTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandTheme.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 /* IslandGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandGeometry.swift; sourceTree = "<group>"; };
+		B10000000000000000000016 /* MonitorSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorSocketServer.swift; sourceTree = "<group>"; };
+		B10000000000000000000017 /* IslandSounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandSounds.swift; sourceTree = "<group>"; };
+		B10000000000000000000018 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		B10000000000000000000019 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		B1000000000000000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1000000000000000000000F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000000000000000000010 /* SessionMonitor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SessionMonitor.entitlements; sourceTree = "<group>"; };
+		B1000000000000000000001A /* hooks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = hooks; path = ../hooks; sourceTree = "<group>"; };
 		C10000000000000000000001 /* SessionMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SessionMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -64,6 +78,7 @@
 			isa = PBXGroup;
 			children = (
 				E10000000000000000000002 /* SessionMonitor */,
+				B1000000000000000000001A /* hooks */,
 				E10000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -109,6 +124,8 @@
 				B10000000000000000000007 /* MockProducer.swift */,
 				B10000000000000000000008 /* ChatHubBridge.swift */,
 				B10000000000000000000012 /* CommandBridge.swift */,
+				B10000000000000000000016 /* MonitorSocketServer.swift */,
+				B10000000000000000000017 /* IslandSounds.swift */,
 				B10000000000000000000009 /* NotificationService.swift */,
 				B1000000000000000000000A /* HotKeyManager.swift */,
 			);
@@ -118,10 +135,14 @@
 		E10000000000000000000006 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				B10000000000000000000014 /* IslandTheme.swift */,
+				B10000000000000000000015 /* IslandGeometry.swift */,
 				B1000000000000000000000B /* VibeIslandView.swift */,
 				B10000000000000000000011 /* IslandUIState.swift */,
 				B1000000000000000000000C /* IslandPanelController.swift */,
 				B1000000000000000000000D /* StatusItemController.swift */,
+				B10000000000000000000018 /* SettingsView.swift */,
+				B10000000000000000000019 /* SettingsWindowController.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -136,6 +157,7 @@
 				F10000000000000000000002 /* Sources */,
 				D10000000000000000000001 /* Frameworks */,
 				F10000000000000000000003 /* Resources */,
+				F1000000000000000000000B /* Stamp build identity */,
 			);
 			buildRules = (
 			);
@@ -185,10 +207,33 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000E /* Assets.xcassets in Resources */,
+				A1000000000000000000001A /* hooks in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		F1000000000000000000000B /* Stamp build identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Stamp build identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/../packaging/stamp-build-identity.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		F10000000000000000000002 /* Sources */ = {
@@ -205,12 +250,18 @@
 				A10000000000000000000007 /* MockProducer.swift in Sources */,
 				A10000000000000000000008 /* ChatHubBridge.swift in Sources */,
 				A10000000000000000000012 /* CommandBridge.swift in Sources */,
+				A10000000000000000000016 /* MonitorSocketServer.swift in Sources */,
+				A10000000000000000000017 /* IslandSounds.swift in Sources */,
 				A10000000000000000000009 /* NotificationService.swift in Sources */,
 				A1000000000000000000000A /* HotKeyManager.swift in Sources */,
+				A10000000000000000000014 /* IslandTheme.swift in Sources */,
+				A10000000000000000000015 /* IslandGeometry.swift in Sources */,
 				A1000000000000000000000B /* VibeIslandView.swift in Sources */,
 				A10000000000000000000011 /* IslandUIState.swift in Sources */,
 				A1000000000000000000000C /* IslandPanelController.swift in Sources */,
 				A1000000000000000000000D /* StatusItemController.swift in Sources */,
+				A10000000000000000000018 /* SettingsView.swift in Sources */,
+				A10000000000000000000019 /* SettingsWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

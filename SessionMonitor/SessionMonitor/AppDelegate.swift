@@ -6,6 +6,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        guard SingleInstance.acquire() else {
+            // Another Session Monitor is already serving the island and the socket.
+            NSApp.terminate(nil)
+            return
+        }
         controller.start()
     }
 

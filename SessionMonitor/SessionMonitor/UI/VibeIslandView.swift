@@ -1,134 +1,341 @@
 import AppKit
 import SwiftUI
 
+/// Vibe-like island:
+/// - **compact**: short black strip — dots left of notch, **count right** (always readable)
+/// - **activity** (hover): wider board with session cards + **+ New**
+/// - **expanded** (⌘⇧A): full board + filters + Allow/Deny / reply
 struct VibeIslandView: View {
     @Bindable var store: SessionStore
     @Bindable var ui: IslandUIState
     @Bindable var prefs: Preferences
     var commands: CommandBridge
     var bridgePath: String
-    var onSizeChange: (CGSize) -> Void
+    var onExpand: () -> Void
+    var onCollapse: () -> Void
+    var onCompact: () -> Void
+    /// Click on the compact strip — opens the list even when hover peek is off.
+    var onOpenList: () -> Void
     var onQuit: () -> Void
+    var onHoverChange: (Bool) -> Void
 
-    private var currentSize: CGSize {
-        let scale = prefs.widthStyle.scale
-        switch ui.mode {
-        case .tucked:
-            return CGSize(width: 120, height: 22)
-        case .pill:
-            return CGSize(width: ((store.waitingCount > 0 ? 176 : 148) * scale).rounded(), height: 24)
-        case .expanded:
-            return CGSize(width: (392 * scale).rounded(), height: 448)
-        }
+    /// Published by the controller so a display change re-lays out the strip; the local
+    /// computation is only a fallback for the first frame.
+    private var metrics: IslandGeometry.Metrics {
+        if let published = ui.metrics { return published }
+        let screen = IslandGeometry.dockingScreen(preferredName: prefs.screenName)
+        return screen.map {
+            IslandGeometry.metrics(
+                for: $0,
+                notchWidthOffset: CGFloat(prefs.notchWidthOffset),
+                notchHeightOffset: CGFloat(prefs.notchHeightOffset)
+            )
+        } ?? IslandGeometry.Metrics(menuBarHeight: 40, notchWidth: IslandTheme.defaultNotchWidth, hasNotch: true)
+    }
+
+    /// Same count the panel is sized for — drawing more would clip the cards and the
+    /// "+ New" button off the bottom edge.
+    private var displaySessions: [SessionMeta] {
+        Array(store.islandSessions.prefix(IslandGeometry.visibleRows(prefs: prefs)))
+    }
+
+    private var liveCount: Int {
+        store.islandSessions.filter(\.status.isLive).count
+    }
+
+    private var visibleWaiting: Int {
+        store.islandSessions.filter { $0.status == .waitingInput }.count
+    }
+
+    /// Live + recently-finished — what the board actually lists. Never labelled "active":
+    /// `islandSessions` keeps a session around for minutes after it said Done.
+    private var recentCount: Int {
+        store.islandSessions.count
     }
 
     var body: some View {
         Group {
             switch ui.mode {
-            case .tucked:
-                tuckedIsland
-            case .pill:
-                pillIsland
+            case .compact:
+                compactStrip
+            case .activity:
+                hoverBoard
             case .expanded:
-                expandedIsland
+                expandedBoard
             }
         }
-        .frame(width: currentSize.width, height: currentSize.height, alignment: .top)
-        .animation(.spring(response: 0.36, dampingFraction: 0.86), value: ui.mode)
-        .onAppear { onSizeChange(currentSize) }
-        .onChange(of: ui.mode) { _, _ in onSizeChange(currentSize) }
-        .onChange(of: prefs.widthStyle) { _, _ in onSizeChange(currentSize) }
-        .onChange(of: store.waitingCount) { _, count in
-            if count > 0, ui.mode == .tucked {
-                ui.mode = .pill
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea()
         .onExitCommand {
-            if ui.mode == .expanded {
-                ui.collapseToPill()
-            } else if ui.mode == .pill {
-                ui.tuck()
-            }
+            if ui.mode == .expanded { onCollapse() }
+            else { onCompact() }
         }
     }
 
-    // MARK: - Tucked
+    // MARK: - Compact strip (Vibe default)
 
-    private var tuckedIsland: some View {
+    private var compactStrip: some View {
         Button {
-            ui.mode = store.waitingCount > 0 || hasLive ? .pill : .expanded
+            onOpenList()
         } label: {
-            HStack(spacing: 6) {
-                Capsule()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: 36, height: 4)
-                if store.waitingCount > 0 {
-                    Circle()
-                        .fill(Color.white.opacity(0.85))
-                        .frame(width: 5, height: 5)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(CurtainShell(topRadius: 0, bottomRadius: 10, emphasize: store.waitingCount > 0))
+            notchStrip(count: liveCount, sessions: displaySessions, style: prefs.compactStyle)
+                .frame(height: metrics.stripHeight)
+                .background(Shell(corner: IslandTheme.stripBottomRadius, pulsing: ui.attentionPulse))
         }
         .buttonStyle(.plain)
-        .help("Session Monitor")
+        .help("Hover or click · ⌘⇧A expand")
+        .contextMenu { ctxMenu }
     }
 
-    // MARK: - Pill
+    /// The session the Detailed strip speaks for: whoever needs the user first, else the
+    /// top card. A strip naming a running session while another one waits would point
+    /// the eye at the wrong window.
+    private var headlineSession: SessionMeta? {
+        displaySessions.first { $0.status == .waitingInput } ?? displaySessions.first
+    }
 
-    private var pillIsland: some View {
-        Button {
-            ui.expand()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: leadingSymbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.75))
-
-                HStack(spacing: -3) {
-                    ForEach(collapsedDots.prefix(3)) { session in
+    /// Left wing dots (or Detailed title) · empty notch · right wing **big count**.
+    private func notchStrip(count: Int, sessions: [SessionMeta], style: CompactStyle) -> some View {
+        // Derived from the panel width the controller sized, so a Detailed wing clamped
+        // to the menu bar budget still stops short of the camera housing.
+        let wing = IslandGeometry.stripWingWidth(
+            metrics: metrics,
+            scale: prefs.widthStyle.scale,
+            style: style
+        )
+        let headline = style == .detailed ? headlineSession : nil
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            // LEFT — status dots, padded away from the camera edge
+            HStack(spacing: 5) {
+                Spacer(minLength: 0)
+                if let headline {
+                    Circle()
+                        .fill(IslandTheme.statusColor(headline.status))
+                        .frame(width: IslandTheme.statusDot, height: IslandTheme.statusDot)
+                    Text(headline.title)
+                        .font(IslandTheme.stripTitleFont)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                } else if sessions.isEmpty {
+                    Image(systemName: "circle.grid.2x1.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                } else {
+                    ForEach(sessions.prefix(3)) { s in
                         Circle()
-                            .fill(color(for: session.status))
-                            .frame(width: 6, height: 6)
-                            .overlay(Circle().stroke(Color.black.opacity(0.55), lineWidth: 0.8))
+                            .fill(IslandTheme.statusColor(s.status))
+                            .frame(width: IslandTheme.statusDot, height: IslandTheme.statusDot)
                     }
                 }
+            }
+            .padding(.trailing, 6)
+            .frame(width: wing)
 
-                // Number = sessions waiting for your input (real agents only).
-                if store.waitingCount > 0 {
-                    Text("\(store.waitingCount)")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.white.opacity(0.9)))
-                } else if liveCount > 0 {
-                    Text("\(liveCount)")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.55))
+            Color.clear
+                .frame(width: metrics.notchWidth)
+
+            // RIGHT — count always visible, padded from camera
+            HStack(spacing: 5) {
+                if let headline {
+                    Text(headline.status.label)
+                        .font(IslandTheme.stripStatusFont)
+                        .foregroundStyle(IslandTheme.statusChipForeground(headline.status))
+                        .lineLimit(1)
+                }
+                Text(count > 0 ? "\(count)" : "·")
+                    .font(IslandTheme.countFont)
+                    .foregroundStyle(count > 0 ? Color.white : Color.white.opacity(0.3))
+                    .monospacedDigit()
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 6)
+            .frame(width: wing)
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Hover board
+
+    private var hoverBoard: some View {
+        VStack(spacing: 0) {
+            // Thin top = menu bar height only (black continuous with body)
+            Color.clear
+                .frame(height: metrics.stripHeight)
+                .overlay {
+                    // Mini strip: dots + count still visible while list is open. Always
+                    // Clean — the board is sized from `panelWidth`, not from the menu bar
+                    // budget, so Detailed wings would not line up with it, and the title
+                    // it would carry is already the first card underneath.
+                    notchStrip(count: liveCount, sessions: displaySessions, style: .clean)
+                        .opacity(0.95)
+                }
+
+            VStack(spacing: 6) {
+                // Toolbar: settings + sound hint
+                HStack(spacing: 8) {
+                    Text(visibleWaiting > 0 ? "\(visibleWaiting) need you" : "\(liveCount) active")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(visibleWaiting > 0 ? IslandTheme.waiting : .white.opacity(0.5))
+                    Spacer()
+                    Button {
+                        // Open settings via notification to AppController/status item path
+                        NotificationCenter.default.post(name: .sessionMonitorOpenSettings, object: nil)
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.55))
+                            .frame(width: 28, height: 28)
+                            .background(Circle().fill(Color.white.opacity(0.08)))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings (sound, notch, notifications)")
+                }
+                .padding(.horizontal, 4)
+
+                // Cards scroll rather than overflow: a card that is a few points taller
+                // than estimated must not push "+ New" past the panel's bottom edge.
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 6) {
+                        ForEach(displaySessions) { session in
+                            VStack(spacing: 6) {
+                                HoverSessionRow(
+                                    session: session,
+                                    showChips: prefs.showStatusChips,
+                                    showActivity: prefs.showActivityDetail,
+                                    showPath: prefs.showPathsInRows,
+                                    fontSize: CGFloat(prefs.contentFontSize)
+                                ) {
+                                    ui.selectedSessionId = session.id
+                                    open(session)
+                                }
+                                // Approving is the reason the island exists — never make the user
+                                // press ⌘⇧A to reach the buttons.
+                                if session.status == .waitingInput, let pending = session.pending {
+                                    pendingActions(session: session, pending: pending)
+                                }
+                            }
+                        }
+                        if displaySessions.isEmpty {
+                            Text("No live sessions")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                    }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+
+                Button(action: newChat) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("New")
+                            .font(.system(size: 12.5, weight: .semibold))
+                        Spacer()
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 14)
+                    .frame(height: IslandTheme.newButtonHeight)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, IslandTheme.listPad)
+            .padding(.bottom, 10)
+            .padding(.top, 4)
+        }
+        .background(Shell(corner: IslandTheme.panelCorner))
+        .contextMenu { ctxMenu }
+    }
+
+    /// Inline decision row: what is being asked, and the answers, one click away.
+    @ViewBuilder
+    private func pendingActions(session: SessionMeta, pending: PendingInteraction) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: isPermission(pending) ? "lock.shield" : "questionmark.circle")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(IslandTheme.waiting)
+            Text(pending.promptText)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.8))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 6)
+            // No chip we cannot honour: a terminal `session.question` has no reply channel,
+            // and a permission whose hook already went away answers nobody.
+            let options = store.canAnswer(session) ? chipOptions(for: pending) : []
+            if options.isEmpty {
+                Text(store.canAnswer(session) ? "⌘⇧A to reply" : "answer in terminal")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+            } else {
+                ForEach(options, id: \.self) { option in
+                    Button(option) {
+                        store.answer(sessionId: session.id, text: option, commands: commands)
+                    }
+                    .buttonStyle(ChipStyle(destructive: isDeny(option)))
                 }
             }
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(CurtainShell(topRadius: 0, bottomRadius: 12, emphasize: store.waitingCount > 0))
         }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button("Expand") { ui.expand() }
-            Button("Hide") { ui.tuck() }
-            Divider()
-            Button("Quit") { onQuit() }
-        }
-        .help("Badge = agents waiting for input · ⌘⇧A expand")
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(IslandTheme.waiting.opacity(0.10))
+        )
+    }
+
+    /// Allow/Deny is the permission protocol, not a default: a question with no options
+    /// expects free text, and inventing two buttons for it sends a word nobody asked for.
+    private func chipOptions(for pending: PendingInteraction) -> [String] {
+        if isPermission(pending) { return pending.options ?? ["Allow", "Deny"] }
+        return pending.options ?? []
+    }
+
+    private func isPermission(_ pending: PendingInteraction) -> Bool {
+        if case .permission = pending { return true }
+        return false
+    }
+
+    private func isDeny(_ option: String) -> Bool {
+        ["deny", "no", "reject", "cancel"].contains(option.lowercased())
     }
 
     // MARK: - Expanded
 
-    private var expandedIsland: some View {
+    private var expandedBoard: some View {
         VStack(spacing: 0) {
-            dragHandle
-            header
+            Color.clear.frame(height: metrics.stripHeight)
+
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Sessions")
+                        .font(IslandTheme.titleFont)
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(visibleWaiting > 0 ? IslandTheme.waiting : .white.opacity(0.45))
+                }
+                Spacer()
+                Button(action: onCollapse) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.white.opacity(0.07)))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
+
             filterBar
             sessionList
             if let selected = selectedSession {
@@ -142,117 +349,86 @@ struct VibeIslandView: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 6)
             }
-            footer
-        }
-        .background(CurtainShell(topRadius: 0, bottomRadius: 22, emphasize: store.waitingCount > 0))
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 22,
-                bottomTrailingRadius: 22,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-        )
-    }
 
-    private var dragHandle: some View {
-        Button {
-            ui.collapseToPill()
-        } label: {
-            Capsule()
-                .fill(Color.white.opacity(0.18))
-                .frame(width: 34, height: 4)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Sessions")
-                    .font(.system(size: 13, weight: .semibold))
-                Text(
-                    store.waitingCount > 0
-                        ? "\(store.waitingCount) waiting for input"
-                        : "Live from Chat Hub"
-                )
-                .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.4))
-            }
-            Spacer()
-            Button {
-                ui.tuck()
-            } label: {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .padding(6)
-                    .background(Circle().fill(Color.white.opacity(0.07)))
+            Button(action: newChat) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                    Text("New chat in Hub")
+                    Spacer()
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.06)))
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
+
+            footer
         }
-        .padding(.horizontal, 14)
-        .padding(.bottom, 8)
+        .background(Shell(corner: IslandTheme.panelCorner))
+    }
+
+    private var subtitle: String {
+        if visibleWaiting > 0 {
+            return "\(visibleWaiting) waiting · \(liveCount) live · \(recentCount) recent"
+        }
+        return "\(liveCount) live · \(recentCount) recent"
     }
 
     private var filterBar: some View {
         HStack(spacing: 6) {
             ForEach(IslandUIState.SessionFilter.allCases, id: \.self) { option in
-                Button {
-                    ui.filter = option
-                } label: {
+                Button { ui.filter = option } label: {
                     Text(option.rawValue)
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(ui.filter == option ? 0.95 : 0.45))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(
-                            Capsule().fill(Color.white.opacity(ui.filter == option ? 0.14 : 0.05))
-                        )
+                        .background(Capsule().fill(Color.white.opacity(ui.filter == option ? 0.14 : 0.05)))
                 }
                 .buttonStyle(.plain)
             }
             Spacer()
+            Text("\(filteredSessions.count)")
+                .font(IslandTheme.countFont)
+                .foregroundStyle(.white.opacity(0.7))
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
 
     private var sessionList: some View {
         Group {
             if filteredSessions.isEmpty {
-                VStack(spacing: 6) {
-                    Text(emptyTitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
-                    Text("Start a chat in Chat Hub — it appears here")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.35))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 28)
+                Text("No sessions — New chat or start Claude in Terminal")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(24)
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 5) {
+                    LazyVStack(spacing: 6) {
                         ForEach(filteredSessions) { session in
-                            IslandSessionRow(
+                            HoverSessionRow(
                                 session: session,
-                                selected: ui.selectedSessionId == session.id
+                                selected: ui.selectedSessionId == session.id,
+                                showChips: prefs.showStatusChips,
+                                showActivity: prefs.showActivityDetail,
+                                showPath: prefs.showPathsInRows,
+                                fontSize: CGFloat(prefs.contentFontSize)
                             ) {
                                 ui.selectedSessionId = session.id
-                                store.openChat(sessionId: session.id, commands: commands)
+                                open(session)
                             }
                         }
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 6)
+                    .padding(.horizontal, 12)
                 }
-                .frame(maxHeight: selectedSession?.status == .waitingInput ? 160 : 240)
+                // The list is the only elastic part of the board: it yields whatever the
+                // detail pane, reply field, CTA and footer need instead of pushing them
+                // outside the panel, where they simply aren't drawn.
+                .frame(maxHeight: .infinity)
             }
         }
     }
@@ -263,160 +439,267 @@ struct VibeIslandView: View {
             HStack {
                 Text(session.title)
                     .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 Spacer()
-                Button {
-                    store.openChat(sessionId: session.id, commands: commands)
-                } label: {
-                    Label(
-                        session.openActionLabel,
-                        systemImage: session.isTerminalSession ? "terminal" : "arrow.up.right.square"
-                    )
-                    .font(.system(size: 10, weight: .semibold))
+                Button { open(session) } label: {
+                    Label(session.openActionLabel, systemImage: session.isTerminalSession ? "terminal" : "arrow.up.right.square")
+                        .font(.system(size: 10, weight: .semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.white.opacity(0.8))
                 .disabled(session.isMock)
             }
 
             if session.status == .waitingInput {
-                Text(session.pending?.promptText ?? "Waiting for your input")
+                Text(session.pending?.promptText ?? "Waiting for input")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.7))
-                    .fixedSize(horizontal: false, vertical: true)
 
-                if session.isTerminalSession {
-                    // v1: terminal sessions are monitor-only — reply happens in the terminal.
-                    Button {
-                        store.openChat(sessionId: session.id, commands: commands)
-                    } label: {
-                        Text("Switch to terminal to respond →")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                    .buttonStyle(.plain)
-                } else if let options = session.pending?.options, !options.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(options, id: \.self) { option in
-                            Button(option) {
-                                store.answer(
-                                    sessionId: session.id,
-                                    text: option,
-                                    commands: commands
-                                )
-                                ui.draftReply = ""
+                if let pending = session.pending, store.canAnswer(session) {
+                    let options = chipOptions(for: pending)
+                    if !options.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(options, id: \.self) { option in
+                                Button(option) {
+                                    store.answer(sessionId: session.id, text: option, commands: commands)
+                                }
+                                .buttonStyle(ChipStyle(destructive: isDeny(option)))
                             }
-                            .buttonStyle(IslandChipButton(destructive: option.lowercased() == "deny"))
                         }
                     }
+                } else if session.isTerminalSession {
+                    Text("Only the terminal can answer this one.")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.4))
                 }
 
                 if !session.isTerminalSession {
-                HStack(spacing: 8) {
-                    TextField("Reply…", text: $ui.draftReply)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.white.opacity(0.07))
-                        )
-                        .onSubmit { sendDraft(for: session) }
-
-                    Button {
-                        sendDraft(for: session)
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.black)
-                            .frame(width: 32, height: 32)
-                            .background(Circle().fill(Color.white.opacity(0.9)))
+                    HStack(spacing: 8) {
+                        TextField("Reply…", text: $ui.draftReply)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white)
+                            .padding(8)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.07)))
+                            .onSubmit { sendDraft(session) }
+                        Button { sendDraft(session) } label: {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundStyle(.black)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(IslandTheme.waiting))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                }
-            } else if !session.isMock {
-                Text("Click row or Open in Hub to jump to this chat")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.35))
-            } else {
-                Text("Demo session — enable SESSION_MONITOR_MOCK=1 only for UI tests")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.35))
             }
         }
         .padding(12)
         .background(Color.white.opacity(0.04))
-        .overlay(alignment: .top) {
-            Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1)
-        }
     }
 
     private var footer: some View {
         HStack {
-            Text("⌘⇧A · Esc · number = waiting")
+            Text("⌘⇧A · Esc · hover to peek")
                 .font(.system(size: 9))
                 .foregroundStyle(.white.opacity(0.28))
             Spacer()
             Button("Quit") { onQuit() }
                 .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 10))
                 .foregroundStyle(.white.opacity(0.4))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
     }
 
-    private func sendDraft(for session: SessionMeta) {
-        let text = ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        store.answer(sessionId: session.id, text: text, commands: commands)
+    @ViewBuilder private var ctxMenu: some View {
+        Button("Expand") { onExpand() }
+        Button("Compact") { onCompact() }
+        Button("New chat") { newChat() }
+        Divider()
+        Button("Quit") { onQuit() }
+    }
+
+    private func open(_ session: SessionMeta) {
+        guard prefs.clickToJump else {
+            store.setOpenResult("Click-to-jump is off — enable it in Settings › General")
+            return
+        }
+        store.openChat(sessionId: session.id, commands: commands)
+    }
+
+    private func newChat() {
+        let ok = commands.newSession(provider: prefs.defaultNewProvider)
+        store.setOpenResult(
+            ok
+                ? "Opening Chat Hub — new session…"
+                : "Start Chat Hub (pnpm dev) to create sessions"
+        )
+    }
+
+    private func sendDraft(_ session: SessionMeta) {
+        let t = ui.draftReply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return }
+        store.answer(sessionId: session.id, text: t, commands: commands)
         ui.draftReply = ""
     }
 
-    private var filteredSessions: [SessionMeta] {
-        store.islandSessions(filter: ui.filter)
-    }
-
-    private var emptyTitle: String {
-        switch ui.filter {
-        case .waiting: "Nothing waiting on you"
-        case .all: "No agent sessions yet"
-        case .live: "No active sessions"
-        }
-    }
+    private var filteredSessions: [SessionMeta] { store.islandSessions(filter: ui.filter) }
 
     private var selectedSession: SessionMeta? {
-        guard let id = ui.selectedSessionId else {
-            return filteredSessions.first { $0.status == .waitingInput } ?? filteredSessions.first
+        if let id = ui.selectedSessionId, let s = store.sessions.first(where: { $0.id == id }) { return s }
+        return filteredSessions.first { $0.status == .waitingInput } ?? filteredSessions.first
+    }
+}
+
+// MARK: - Rows (product card — project · host · CLI · model · age · open/closed)
+
+private struct HoverSessionRow: View {
+    let session: SessionMeta
+    var selected: Bool = false
+    var showChips: Bool = true
+    var showActivity: Bool = true
+    var showPath: Bool = false
+    /// Base point size from Settings → Display; every line scales off it.
+    var fontSize: CGFloat = 12.5
+    var onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 6) {
+                // Line 1: status dot · project · title fragment · chips · age
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(IslandTheme.statusColor(session.status))
+                        .frame(width: 8, height: 8)
+                        .opacity(session.isClosed ? 0.35 : 1)
+
+                    Text(session.projectLabel)
+                        .font(.system(size: fontSize, weight: .semibold))
+                        .foregroundStyle(.white.opacity(session.isClosed ? 0.45 : 0.95))
+                        .lineLimit(1)
+                        .layoutPriority(2)
+
+                    if !session.displayTitle.isEmpty, session.displayTitle != session.projectLabel {
+                        Text("·")
+                            .foregroundStyle(.white.opacity(0.25))
+                        Text(session.displayTitle)
+                            .font(.system(size: fontSize - 0.5, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .layoutPriority(1)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    if showChips {
+                        HStack(spacing: 6) {
+                            if session.showsProviderChip {
+                                chip(session.providerLabel, color: IslandTheme.providerColor(session.provider))
+                            }
+                            chip(session.hostLabel, color: .white.opacity(0.7))
+                            if let model = session.model, !model.isEmpty {
+                                chip(shortModel(model), color: .white.opacity(0.55))
+                            }
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(3)
+                    }
+                    Text(session.relativeAge())
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .monospacedDigit()
+                }
+
+                // Line 2: Ready / Running / Closed + last activity
+                HStack(spacing: 8) {
+                    Text(session.displayStatus)
+                        .font(.system(size: fontSize - 1.5, weight: .semibold))
+                        .foregroundStyle(statusColor)
+
+                    if session.isClosed {
+                        Text("· chat closed")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.35))
+                    } else if showActivity, let activity = session.lastActivity, !activity.isEmpty {
+                        Text(activity)
+                            .font(.system(size: fontSize - 1.5))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .truncationMode(.middle)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                if showPath, let cwd = session.cwd, !cwd.isEmpty {
+                    Text(shortPath(cwd))
+                        .font(.system(size: fontSize - 2.5, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.3))
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: IslandTheme.rowCorner, style: .continuous)
+                    .fill(
+                        session.status == .waitingInput || selected
+                            ? Color.white.opacity(0.09)
+                            : Color.white.opacity(0.045)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: IslandTheme.rowCorner, style: .continuous)
+                    .stroke(
+                        session.isClosed
+                            ? Color.white.opacity(0.04)
+                            : (session.status == .waitingInput
+                                ? IslandTheme.waiting.opacity(0.35)
+                                : Color.clear),
+                        lineWidth: 1
+                    )
+            )
+            .opacity(session.isClosed ? 0.75 : 1)
         }
-        return store.sessions.first { $0.id == id } ?? filteredSessions.first
+        .buttonStyle(.plain)
     }
 
-    private var collapsedDots: [SessionMeta] { store.islandSessions }
-
-    private var liveCount: Int {
-        store.islandSessions.filter(\.status.isLive).count
+    private var statusColor: Color {
+        if session.isClosed { return .white.opacity(0.4) }
+        return IslandTheme.statusChipForeground(session.status)
     }
 
-    private var hasLive: Bool { liveCount > 0 }
-
-    private var leadingSymbol: String {
-        if store.waitingCount > 0 { return "bell.fill" }
-        if hasLive { return "waveform" }
-        return "circle.grid.2x1.fill"
+    private func chip(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(Capsule().fill(color.opacity(0.14)))
     }
 
-    private func color(for status: SessionStatus) -> Color {
-        switch status {
-        case .running: Color.white.opacity(0.72)
-        case .waitingInput: Color.white.opacity(0.95)
-        case .error: Color.white.opacity(0.45)
-        case .done: Color.white.opacity(0.22)
-        case .idle: Color.white.opacity(0.18)
+    private func shortPath(_ path: String) -> String {
+        let home = NSHomeDirectory()
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+    }
+
+    private func shortModel(_ model: String) -> String {
+        // claude-sonnet-4-20250514 → sonnet-4
+        let parts = model.split(separator: "-").map(String.init)
+        if parts.count >= 2 {
+            let interesting = parts.filter { !["claude", "gpt", "openai", "google"].contains($0.lowercased()) }
+            return interesting.prefix(2).joined(separator: "-")
         }
+        return String(model.prefix(12))
     }
 }
 
@@ -424,149 +707,41 @@ struct IslandSessionRow: View {
     let session: SessionMeta
     var selected: Bool
     var onSelect: () -> Void
-
     var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 26, height: 26)
-                    Image(systemName: providerSymbol)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.7))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(session.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.92))
-                        .lineLimit(1)
-                    HStack(spacing: 4) {
-                        Text(session.provider.capitalized)
-                            .foregroundStyle(.white.opacity(0.5))
-                        Text("·").foregroundStyle(.white.opacity(0.2))
-                        Text(shortPath(session.cwd))
-                            .foregroundStyle(.white.opacity(0.32))
-                            .lineLimit(1)
-                    }
-                    .font(.system(size: 10))
-                }
-
-                Spacer(minLength: 4)
-
-                Text(session.status.label)
-                    .font(.system(size: 9, weight: .bold))
-                    .textCase(.uppercase)
-                    .foregroundStyle(Color.white.opacity(statusOpacity))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.white.opacity(0.08)))
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(selected || session.status == .waitingInput
-                          ? Color.white.opacity(0.09)
-                          : Color.white.opacity(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(
-                        Color.white.opacity(
-                            session.status == .waitingInput ? 0.22 : (selected ? 0.12 : 0.05)
-                        ),
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button("Open in Chat Hub") { onSelect() }
-            Button("Copy session ID") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(session.id, forType: .string)
-            }
-            if let cwd = session.cwd, !cwd.isEmpty {
-                Button("Reveal project") {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: cwd)])
-                }
-            }
-        }
-    }
-
-    private var statusOpacity: Double {
-        switch session.status {
-        case .waitingInput: 0.9
-        case .running: 0.7
-        case .error: 0.55
-        default: 0.4
-        }
-    }
-
-    private var providerSymbol: String {
-        switch session.provider.lowercased() {
-        case "grok": "sparkles"
-        case "claude": "brain.head.profile"
-        case "codex": "chevron.left.forwardslash.chevron.right"
-        case "opencode": "terminal"
-        default: "bubble.left.and.bubble.right.fill"
-        }
-    }
-
-    private func shortPath(_ cwd: String?) -> String {
-        guard let cwd, !cwd.isEmpty else { return "—" }
-        let parts = cwd.split(separator: "/").map(String.init)
-        if parts.count <= 2 { return cwd }
-        return "…/" + parts.suffix(2).joined(separator: "/")
+        HoverSessionRow(session: session, selected: selected, onSelect: onSelect)
     }
 }
 
-private struct IslandChipButton: ButtonStyle {
-    var destructive: Bool = false
+// MARK: - Shell
 
+private struct Shell: View {
+    var corner: CGFloat
+    /// Ambient cue when an agent needs the user and the island stays collapsed.
+    var pulsing: Bool = false
+    var body: some View {
+        let shape = UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: corner,
+            bottomTrailingRadius: corner,
+            topTrailingRadius: 0,
+            style: .continuous
+        )
+        shape.fill(IslandTheme.shellFill.opacity(0.97))
+            .overlay(shape.stroke(IslandTheme.waiting.opacity(pulsing ? 0.9 : 0), lineWidth: 2))
+            .shadow(color: pulsing ? IslandTheme.waiting.opacity(0.35) : .black.opacity(0.5), radius: 20, y: 10)
+            .animation(.easeOut(duration: 0.25), value: pulsing)
+    }
+}
+
+private struct ChipStyle: ButtonStyle {
+    var destructive: Bool = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.white.opacity(destructive ? 0.55 : 0.9))
+            .foregroundStyle(destructive ? Color.white.opacity(0.55) : IslandTheme.waiting)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
-            .background(
-                Capsule().fill(Color.white.opacity(destructive ? 0.06 : 0.1))
-            )
+            .background(Capsule().fill(destructive ? Color.white.opacity(0.06) : IslandTheme.waiting.opacity(0.14)))
             .opacity(configuration.isPressed ? 0.75 : 1)
-    }
-}
-
-private struct CurtainShell: View {
-    var topRadius: CGFloat
-    var bottomRadius: CGFloat
-    var emphasize: Bool
-
-    var body: some View {
-        let shape = UnevenRoundedRectangle(
-            topLeadingRadius: topRadius,
-            bottomLeadingRadius: bottomRadius,
-            bottomTrailingRadius: bottomRadius,
-            topTrailingRadius: topRadius,
-            style: .continuous
-        )
-        ZStack {
-            shape.fill(Color.black.opacity(0.97))
-            shape.fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.1),
-                        Color.white.opacity(0.02),
-                        Color.clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            shape.stroke(Color.white.opacity(emphasize ? 0.16 : 0.09), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.35), radius: 10, y: 6)
     }
 }

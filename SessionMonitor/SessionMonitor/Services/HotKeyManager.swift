@@ -41,7 +41,7 @@ final class HotKeyManager {
             &handler
         )
 
-        var hotKeyID = EventHotKeyID(signature: OSType(0x534D4F4E), id: 1)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x534D4F4E), id: 1)
         // Cmd+Shift+A
         RegisterEventHotKey(
             UInt32(kVK_ANSI_A),

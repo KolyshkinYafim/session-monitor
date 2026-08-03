@@ -42,10 +42,16 @@ final class StatusItemController {
         panel.toggleExpanded()
     }
 
+    var onOpenSettings: (() -> Void)?
+
     private func showMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Show Island", action: #selector(expand), keyEquivalent: "")
-        menu.addItem(withTitle: "Hide in menu bar", action: #selector(tuck), keyEquivalent: "")
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
+        menu.addItem(settings)
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Expand Island", action: #selector(expand), keyEquivalent: "")
+        menu.addItem(withTitle: "Compact Island", action: #selector(compact), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(widthMenuItem())
         menu.addItem(displayMenuItem())
@@ -55,6 +61,10 @@ final class StatusItemController {
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
+    }
+
+    @objc private func openSettings() {
+        onOpenSettings?()
     }
 
     private func widthMenuItem() -> NSMenuItem {
@@ -74,7 +84,7 @@ final class StatusItemController {
     private func displayMenuItem() -> NSMenuItem {
         let parent = NSMenuItem(title: "Show on display", action: nil, keyEquivalent: "")
         let submenu = NSMenu()
-        let auto = NSMenuItem(title: "Automatic (primary)", action: #selector(selectScreen(_:)), keyEquivalent: "")
+        let auto = NSMenuItem(title: "Automatic (notch / primary)", action: #selector(selectScreen(_:)), keyEquivalent: "")
         auto.target = self
         auto.representedObject = ""
         auto.state = prefs.screenName == nil ? .on : .off
@@ -93,7 +103,7 @@ final class StatusItemController {
     }
 
     @objc private func expand() { panel.expand() }
-    @objc private func tuck() { panel.tuck() }
+    @objc private func compact() { panel.compact() }
     @objc private func quit() { NSApp.terminate(nil) }
 
     @objc private func selectWidth(_ sender: NSMenuItem) {
@@ -111,12 +121,12 @@ final class StatusItemController {
 
     func updateBadge() {
         guard let button = statusItem.button else { return }
+        // Icon-only in the menu bar — count lives in the island (avoids a second “1/2” next to the notch).
+        button.title = ""
         let count = store.waitingCount
-        button.title = count > 0 ? " \(count)" : ""
-        // NOTE: do NOT pulse/re-order the panel here. This runs on a 500ms poll, and pulsing
-        // reset the 10s auto-tuck timer every half-second (so it never fired) and re-ordered
-        // the panel constantly. The pulse is driven from AppController's status-change handler
-        // on a *real* waiting_input transition instead.
+        button.toolTip = count > 0
+            ? "Session Monitor · \(count) waiting"
+            : "Session Monitor"
     }
 
     private static func makeIcon() -> NSImage {

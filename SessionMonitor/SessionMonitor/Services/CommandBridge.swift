@@ -309,18 +309,22 @@ final class CommandBridge {
         }
 
         // Same id as chat-hub/electron-builder.yml `appId` — the only identity that survives a
-        // productName rename, so it must not drift from that file.
-        if let app = NSRunningApplication.runningApplications(
-            withBundleIdentifier: "com.agentdesktop.chat-hub"
-        ).first {
-            app.activate(options: [.activateAllWindows])
+        // productName/path change. `urlForApplication` also finds a signed app outside
+        // /Applications (for example, a release opened from Downloads), which matters here:
+        // the command was already written before we try to launch the Hub.
+        let bundleId = "com.agentdesktop.chat-hub"
+        if let packaged = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            NSWorkspace.shared.openApplication(at: packaged, configuration: configuration)
             return true
         }
 
-        // Packaged app on disk
+        // Keep the explicit fallback for an app bundle that has not yet been registered by
+        // Launch Services (common immediately after a local install).
         let packaged = URL(fileURLWithPath: "/Applications/Chat Hub.app")
         if FileManager.default.fileExists(atPath: packaged.path) {
-            NSWorkspace.shared.open(packaged)
+            NSWorkspace.shared.openApplication(at: packaged, configuration: NSWorkspace.OpenConfiguration())
             return true
         }
 

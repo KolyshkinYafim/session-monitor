@@ -380,15 +380,18 @@ struct VibeIslandView: View {
     private var filterBar: some View {
         HStack(spacing: 6) {
             ForEach(IslandUIState.SessionFilter.allCases, id: \.self) { option in
-                Button { ui.filter = option } label: {
-                    Text(option.rawValue)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(ui.filter == option ? 0.95 : 0.45))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.white.opacity(ui.filter == option ? 0.14 : 0.05)))
+                filterChip(option.rawValue, selected: ui.filter == option) { ui.filter = option }
+            }
+            // Status and origin are independent picks. Without a break the six capsules read
+            // as one six-way choice, and two of them look lit at once for no reason.
+            Rectangle()
+                .fill(Color.white.opacity(0.12))
+                .frame(width: 1, height: 12)
+                .padding(.horizontal, 2)
+            ForEach(IslandUIState.SourceFilter.allCases, id: \.self) { option in
+                filterChip(option.rawValue, selected: ui.sourceFilter == option) {
+                    ui.sourceFilter = option
                 }
-                .buttonStyle(.plain)
             }
             Spacer()
             Text("\(filteredSessions.count)")
@@ -397,6 +400,22 @@ struct VibeIslandView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
+    }
+
+    private func filterChip(
+        _ label: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(selected ? 0.95 : 0.45))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.white.opacity(selected ? 0.14 : 0.05)))
+        }
+        .buttonStyle(.plain)
     }
 
     private var sessionList: some View {
@@ -545,7 +564,9 @@ struct VibeIslandView: View {
         ui.draftReply = ""
     }
 
-    private var filteredSessions: [SessionMeta] { store.islandSessions(filter: ui.filter) }
+    private var filteredSessions: [SessionMeta] {
+        store.islandSessions(filter: ui.filter, source: ui.sourceFilter)
+    }
 
     private var selectedSession: SessionMeta? {
         if let id = ui.selectedSessionId, let s = store.sessions.first(where: { $0.id == id }) { return s }

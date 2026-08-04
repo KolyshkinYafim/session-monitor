@@ -19,10 +19,29 @@ final class IslandUIState {
         case waiting = "Wait"
     }
 
+    /// Where the session came from. Chat Hub and the terminal hook both raise cards, and while
+    /// you work in one of them the other is usually noise.
+    enum SourceFilter: String, CaseIterable {
+        case any = "Any"
+        case hub = "Hub"
+        case terminal = "Term"
+
+        func matches(_ session: SessionMeta) -> Bool {
+            switch self {
+            case .any: true
+            case .hub: session.source == .hub
+            // The card's own notion of "terminal", so a row wearing a terminal chip can
+            // never be the one this filter hides.
+            case .terminal: session.isTerminalSession
+            }
+        }
+    }
+
     var mode: Mode = .compact
     var selectedSessionId: String?
     var draftReply: String = ""
     var filter: SessionFilter = .live
+    var sourceFilter: SourceFilter = .any
     var attentionPulse: Bool = false
     /// Published by the panel controller: NSScreen is not observable, so a view reading
     /// it in `body` never re-lays out when displays change.

@@ -25,6 +25,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import socket
 import sys
 import time
@@ -165,6 +166,80 @@ def _basename(path) -> str:
     return name or str(path)
 
 
+# The harness resumes an agent with turns the user never typed — background-task
+# notifications, slash-command echoes, scheduled-task briefs, injected IDE context — and they
+# arrive on UserPromptSubmit indistinguishable from a real prompt. Across ~1.5k prompts in
+# ~/.claude/projects transcripts every one of them was wrapped in one of these tags, and no
+# genuine prompt ever started with one. It is an allowlist rather than "looks like markup"
+# because pasting HTML and asking about it is a real prompt.
+HARNESS_TAGS = (
+    "system-reminder",
+    "task-notification",
+    "scheduled-task",
+    "local-command-caveat",
+    "local-command-stdout",
+    "command-name",
+    "command-message",
+    "command-args",
+    "ide_opened_file",
+    "ide_selection",
+    "user-prompt-submit-hook",
+)
+
+_HARNESS_BLOCK = re.compile(
+    r"^\s*<(" + "|".join(HARNESS_TAGS) + r")(?:\s[^>]*)?>.*?</\1\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
+_HARNESS_OPEN = re.compile(
+    r"^\s*<(" + "|".join(HARNESS_TAGS) + r")(?:\s[^>]*)?>",
+    re.IGNORECASE,
+)
+_HARNESS_SUMMARY = re.compile(r"<summary>(.*?)</summary>", re.DOTALL | re.IGNORECASE)
+_HARNESS_COMMAND = re.compile(r"^\s*<command-name>(.*?)</command-name>", re.DOTALL | re.IGNORECASE)
+_HARNESS_LEAD = re.compile(r"^\s*<([a-zA-Z][a-zA-Z0-9_-]*)")
+
+_HARNESS_LABELS = {
+    "task-notification": "Background task finished",
+    "scheduled-task": "Scheduled task started",
+    "local-command-caveat": "Local command",
+    "local-command-stdout": "Local command",
+    "system-reminder": "System reminder",
+}
+
+
+def user_typed_text(prompt: str) -> str:
+    """The part of a submitted prompt the user actually typed, "" if there is none.
+
+    Strips rather than rejects, because IDE context arrives as a *prefix* to a real prompt:
+    `<ide_opened_file>…</ide_opened_file>\\nwhere is our ProxyProviderType?`.
+    """
+    text = prompt or ""
+    while True:
+        block = _HARNESS_BLOCK.match(text)
+        if block:
+            text = text[block.end():]
+            continue
+        if _HARNESS_OPEN.match(text):
+            # Opened a harness block that never closes (truncated payload): whatever follows
+            # is the harness talking, not the user.
+            return ""
+        break
+    return text.strip()
+
+
+def harness_activity(prompt: str) -> str:
+    """Card line for a harness turn — the raw block is unreadable at card width."""
+    # A task-notification already carries its own one-liner; nothing we compose beats it.
+    summary = _HARNESS_SUMMARY.search(prompt or "")
+    if summary and summary.group(1).strip():
+        return _short(summary.group(1), 80)
+    command = _HARNESS_COMMAND.match(prompt or "")
+    if command and command.group(1).strip():
+        return _short(command.group(1), 60)
+    lead = _HARNESS_LEAD.match(prompt or "")
+    return _HARNESS_LABELS.get(lead.group(1).lower() if lead else "", "Resumed")
+
+
 def tool_activity(tool: str, tool_input, tool_output=None) -> str:
     """`Read(schema.prisma)` / `Bash(npm test)` — the card line users actually read."""
     args = tool_input if isinstance(tool_input, dict) else {}
@@ -265,9 +340,25 @@ def build_events(data: dict) -> list:
         return [upsert(project, "idle", activity="Session started", model=model)]
 
     if event == "UserPromptSubmit":
-        prompt = (data.get("prompt") or "").strip().replace("\n", " ")
-        title = (prompt[:60] + "…") if len(prompt) > 60 else (prompt or project)
-        return [upsert(title, "running", activity="You: " + (prompt[:80] if prompt else "…"), model=model)]
+        raw = data.get("prompt") or ""
+        typed = user_typed_text(raw).replace("\n", " ").strip()
+        if not typed:
+            # The harness resumed the agent, so the card does have to go back to running —
+            # but the title is how the owner recognises the card, and a turn nobody typed
+            # must not take it over. Status/message carry no title, so the one already on
+            # the card survives; ordering matches Stop's (status is the last word).
+            return [
+                {
+                    "type": "session.message",
+                    "id": sid,
+                    "role": "tool",
+                    "preview": harness_activity(raw),
+                    "ts": now,
+                },
+                {"type": "session.status", "id": sid, "status": "running", "ts": now},
+            ]
+        title = (typed[:60] + "…") if len(typed) > 60 else typed
+        return [upsert(title, "running", activity="You: " + typed[:80], model=model)]
 
     if event == "Notification":
         ntype = data.get("notification_type", "")

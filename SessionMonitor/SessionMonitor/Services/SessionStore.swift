@@ -56,16 +56,22 @@ final class SessionStore {
     /// A session that changed within this window still counts as "on screen".
     private static let recentWindow: TimeInterval = 10 * 60
 
-    /// Sessions for the expanded board under an explicit filter (`Live` / `All` / `Wait`).
+    /// Sessions for the expanded board under an explicit status filter (`Live` / `All` /
+    /// `Wait`) and origin (`Any` / `Hub` / `Term`).
     /// One shared cap: `All` rendering fewer rows than `Live` reads as a broken filter.
-    func islandSessions(filter: IslandUIState.SessionFilter) -> [SessionMeta] {
+    func islandSessions(
+        filter: IslandUIState.SessionFilter,
+        source: IslandUIState.SourceFilter = .any
+    ) -> [SessionMeta] {
         let rows: [SessionMeta]
         switch filter {
         case .live: rows = islandSessions
         case .all: rows = islandSource
         case .waiting: rows = islandSource.filter { $0.status == .waitingInput }
         }
-        return Array(rows.prefix(Self.boardLimit))
+        // Narrow before the cap: capping first would spend the 12 rows on the origin the
+        // user just asked to hide.
+        return Array(rows.filter { source.matches($0) }.prefix(Self.boardLimit))
     }
 
     private static let boardLimit = 12

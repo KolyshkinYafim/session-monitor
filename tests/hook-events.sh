@@ -32,6 +32,18 @@ run() {  # run <label> <json>
 
 run SessionStart     '{"hook_event_name":"SessionStart","session_id":"s1","cwd":"/tmp/demo-proj","model":"claude-opus-5","source":"startup"}'
 run UserPrompt       '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"fix the auth bug in middleware"}'
+# Turns the harness generates and submits as if the user typed them. Each must keep the card
+# moving without renaming it — the shapes below are copied from real ~/.claude transcripts.
+run Prompt-TaskNotif '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<task-notification>\n<task-id>ad4335ccfe55530e8</task-id>\n<tool-use-id>toolu_01ABC</tool-use-id>\n<status>completed</status>\n<summary>Agent \"Find API Gateway usage\" finished</summary>\n<result>Here is what I found.</result>\n</task-notification>"}'
+run Prompt-SlashCmd  '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<command-name>/model</command-name>\n            <command-message>model</command-message>\n            <command-args></command-args>"}'
+run Prompt-LocalOut  '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<local-command-stdout>Set model to claude-opus-5</local-command-stdout>"}'
+run Prompt-Reminder  '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<system-reminder>Your todo list has changed. DO NOT mention this explicitly.</system-reminder>"}'
+# A block that opens and never closes: everything after it is still the harness talking.
+run Prompt-Truncated '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<task-notification>\n<task-id>ad4335ccfe55530e8</task-id>\n<summ"}'
+# IDE context is a *prefix* to a real prompt, so the typed half still has to win the title.
+run Prompt-IdeCtx    '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<ide_opened_file>The user opened the file /tmp/demo-proj/src/api.ts in the IDE. This may or may not be related to the current task.</ide_opened_file>\nwhere is our ProxyProviderType?"}'
+# The reason this is an allowlist and not \"starts with a tag\": pasted markup is a real prompt.
+run Prompt-Markup    '{"hook_event_name":"UserPromptSubmit","session_id":"s1","cwd":"/tmp/demo-proj","prompt":"<div class=\"card\"><span>hi</span></div> why does this overflow?"}'
 run PostToolUse-Read '{"hook_event_name":"PostToolUse","session_id":"s1","cwd":"/tmp/demo-proj","tool_name":"Read","tool_input":{"file_path":"/tmp/demo-proj/prisma/schema.prisma"}}'
 run PostToolUse-Bash '{"hook_event_name":"PostToolUse","session_id":"s1","cwd":"/tmp/demo-proj","tool_name":"Bash","tool_input":{"command":"npm test -- --watch=false"}}'
 run PostToolUse-Edit '{"hook_event_name":"PostToolUse","session_id":"s1","cwd":"/tmp/demo-proj","tool_name":"Edit","tool_input":{"file_path":"/tmp/demo-proj/src/db/queries.ts","old_string":"a\nb\nc","new_string":"a\nb\nc\nd\ne"}}'
@@ -92,6 +104,51 @@ check("ExitPlanMode card shows the plan", any(s.startswith("ExitPlanMode(") for 
 check("no permission card degrades to 'Allow <tool>?'",
       not any(s.startswith("Allow ") for s in by_summary))
 check("Notification becomes a question", any(r["type"] == "session.question" for r in rows))
+sys.exit(1 if bad else 0)
+PY
+[ $? -eq 0 ] || FAILED=$((FAILED + 1))
+
+echo
+echo "=== harness-generated prompts never take over the card title ==="
+/usr/bin/python3 - "$OUT" <<'PY'
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1])]
+bad = 0
+def check(label, cond):
+    global bad
+    print(("  ✓ " if cond else "  ✗ ") + label)
+    if not cond:
+        bad += 1
+
+titles = [r["session"]["title"] for r in rows if r["type"] == "session.upsert"]
+HARNESS = ("<task-notification", "<command-name", "<local-command", "<system-reminder",
+           "<scheduled-task", "<ide_opened_file", "<ide_selection")
+check("no card title is raw harness markup",
+      not any(t.lstrip().startswith(h) for t in titles for h in HARNESS))
+check("the typed prompt is still the title", "fix the auth bug in middleware" in titles)
+# Five harness turns above; none may mint an upsert, each must still say "running".
+running = [i for i, r in enumerate(rows)
+           if r["type"] == "session.status" and r["status"] == "running"]
+check("every harness turn re-runs the card", len(running) == 5)
+check("each one reports activity before the status",
+      all(rows[i - 1]["type"] == "session.message" for i in running if i > 0))
+
+previews = [r["preview"] for r in rows if r["type"] == "session.message"]
+check("a task-notification card shows its summary",
+      'Agent "Find API Gateway usage" finished' in previews)
+check("a slash command card shows the command", "/model" in previews)
+check("local command output is labelled, not dumped", "Local command" in previews)
+check("a system reminder is labelled", "System reminder" in previews)
+check("an unclosed harness block is not leaked as activity",
+      "Background task finished" in previews)
+check("no activity line leaks raw harness markup",
+      not any(p.lstrip().startswith(h) for p in previews for h in HARNESS))
+
+# The other half: stripping context must not cost the user their actual words.
+check("IDE context is stripped, the typed question becomes the title",
+      "where is our ProxyProviderType?" in titles)
+check("pasted markup is still treated as a real prompt",
+      any(t.startswith("<div class=") for t in titles))
 sys.exit(1 if bad else 0)
 PY
 [ $? -eq 0 ] || FAILED=$((FAILED + 1))

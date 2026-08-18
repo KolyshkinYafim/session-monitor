@@ -1,7 +1,15 @@
 #!/bin/bash
 # End-to-end checks for the permission socket: allow, deny, hook death, second instance.
-BIN=~/Library/Developer/Xcode/DerivedData/SessionMonitor-daxwslynqupuawgroqlikvychsef/Build/Products/Debug/SessionMonitor.app/Contents/MacOS/SessionMonitor
-HOOK=/Users/yafimkolyshkin/Desktop/agent-desktop-suite/session-monitor/hooks/agent-desktop-claude-hook.py
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOOK="$ROOT/hooks/agent-desktop-claude-hook.py"
+# Most recently built Debug binary, whichever DerivedData tree it lives in.
+BIN=$(ls -t ~/Library/Developer/Xcode/DerivedData/SessionMonitor-*/Build/Products/Debug/SessionMonitor.app/Contents/MacOS/SessionMonitor 2>/dev/null | head -1)
+if [ -z "$BIN" ]; then
+  BUILT=$(xcodebuild -project "$ROOT/SessionMonitor/SessionMonitor.xcodeproj" -scheme SessionMonitor -configuration Debug -showBuildSettings 2>/dev/null \
+    | sed -n 's/^ *BUILT_PRODUCTS_DIR = //p' | head -1)
+  [ -n "$BUILT" ] && BIN="$BUILT/SessionMonitor.app/Contents/MacOS/SessionMonitor"
+fi
+[ -x "$BIN" ] || { echo "✗ no Debug SessionMonitor binary found — build the app first"; exit 1; }
 SOCK="$HOME/Library/Application Support/agent-desktop/monitor.sock"
 
 start_app() { # start_app <auto-approve value>

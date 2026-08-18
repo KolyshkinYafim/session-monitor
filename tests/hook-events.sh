@@ -4,7 +4,8 @@
 # hurt a live machine — install.sh rewriting a config it could not parse, and an
 # unwritable events.jsonl swallowing the blocking permission round-trip.
 set -u
-HOOKS_DIR=/Users/yafimkolyshkin/Desktop/agent-desktop-suite/session-monitor/hooks
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOOKS_DIR="$ROOT/hooks"
 HOOK="$HOOKS_DIR/agent-desktop-claude-hook.py"
 TMP=$(mktemp -d)
 OUT="$TMP/events.jsonl"

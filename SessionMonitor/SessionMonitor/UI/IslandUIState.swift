@@ -82,7 +82,6 @@ final class IslandUIState {
 
     func toggle() {
         if mode == .expanded {
-            // Back to hover list if sessions, else compact
             mode = .activity
             pinExpanded = false
             openedByEvent = false

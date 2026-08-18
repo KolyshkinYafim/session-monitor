@@ -164,7 +164,6 @@ enum IslandGeometry {
             return CGSize(width: width, height: strip)
 
         case .activity:
-            // Hover board: strip + session cards + New
             let w = (panelWidth * scale).rounded()
             let rows = min(max(sessionRows, 1), IslandTheme.miniRowCount)
             // Each waiting session grows an inline Allow/Deny row under its card.

@@ -227,7 +227,7 @@ final class Preferences {
         didSet { defaults.set(experimentalSSH, forKey: Keys.labSSH) }
     }
 
-    // MARK: -
+    // MARK: - Storage
 
     private let defaults: UserDefaults
     private enum Keys {

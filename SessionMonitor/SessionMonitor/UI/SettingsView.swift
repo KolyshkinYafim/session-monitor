@@ -113,7 +113,7 @@ struct SettingsView: View {
         .padding(.bottom, 16)
     }
 
-    // MARK: General
+    // MARK: - General
 
     private var generalPage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -204,7 +204,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Integrations
+    // MARK: - Integrations
 
     private var integrationsPage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -241,7 +241,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Notifications
+    // MARK: - Notifications
 
     private var notificationsPage: some View {
         @Bindable var notify = notifications
@@ -304,7 +304,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Display
+    // MARK: - Display
 
     private var displayPage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -484,7 +484,7 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: Sound
+    // MARK: - Sound
 
     private var soundPage: some View {
         @Bindable var sound = sounds
@@ -592,7 +592,7 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: Usage
+    // MARK: - Usage
 
     private var usagePage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -605,7 +605,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Shortcuts
+    // MARK: - Shortcuts
 
     private var shortcutsPage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -646,7 +646,7 @@ struct SettingsView: View {
         NSWorkspace.shared.open(url)
     }
 
-    // MARK: SSH
+    // MARK: - SSH
 
     private var sshPage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -661,7 +661,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: Labs
+    // MARK: - Labs
 
     private var labsPage: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -674,7 +674,7 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: About
+    // MARK: - About
 
     private var aboutPage: some View {
         VStack(alignment: .leading, spacing: 18) {

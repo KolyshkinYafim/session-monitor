@@ -164,7 +164,7 @@ enum IslandSounds {
         return from < to ? (now >= from && now < to) : (now >= from || now < to)
     }
 
-    // MARK: -
+    // MARK: - Preference reads
 
     private static var enabled: Bool {
         UserDefaults.standard.object(forKey: "soundsEnabled") as? Bool ?? true

@@ -8,7 +8,6 @@ enum SessionStatus: String, Codable, Sendable, CaseIterable {
     case done
 }
 
-/// Where the agent session lives.
 enum SessionSource: String, Codable, Sendable, Equatable {
     case hub
     case terminal

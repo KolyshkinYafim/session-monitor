@@ -160,20 +160,19 @@ struct VibeIslandView: View {
 
     private var hoverBoard: some View {
         VStack(spacing: 0) {
-            // Thin top = menu bar height only (black continuous with body)
             Color.clear
                 .frame(height: metrics.stripHeight)
                 .overlay {
-                    // Mini strip: dots + count still visible while list is open. Always
-                    // Clean — the board is sized from `panelWidth`, not from the menu bar
-                    // budget, so Detailed wings would not line up with it, and the title
-                    // it would carry is already the first card underneath.
+                    // Mini strip: dots + count still visible while list is open. It always
+                    // uses the Clean style, because the board is sized from `panelWidth`,
+                    // not from the menu bar budget — Detailed wings would not line up with
+                    // it, and the title Detailed would carry is already the first card
+                    // underneath.
                     notchStrip(count: liveCount, sessions: displaySessions, style: .clean)
                         .opacity(0.95)
                 }
 
             VStack(spacing: 6) {
-                // Toolbar: settings + sound hint
                 HStack(spacing: 8) {
                     Text(visibleWaiting > 0 ? "\(visibleWaiting) need you" : "\(liveCount) active")
                         .font(.system(size: 11, weight: .semibold))

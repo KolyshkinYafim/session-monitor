@@ -18,7 +18,6 @@ final class MonitorSocketServer {
     private var listenFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?
     private var clients: [Int32: Client] = [:]
-    /// requestId → pending client awaiting a decision
     private var pending: [String: Pending] = [:]
     private var reaper: Timer?
 

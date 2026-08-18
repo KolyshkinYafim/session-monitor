@@ -83,7 +83,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         reminders.removeValue(forKey: id)?.invalidate()
     }
 
-    // MARK: -
+    // MARK: - Delivery
 
     private func deliver(title: String, subtitle: String, body: String, identifier: String) {
         let content = UNMutableNotificationContent()

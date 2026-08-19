@@ -1,5 +1,7 @@
 # Session Monitor
 
+[![CI](https://github.com/KolyshkinYafim/session-monitor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/KolyshkinYafim/session-monitor/actions/workflows/ci.yml)
+
 > Ambient control surface for AI coding agent sessions (Vibe Island–class).
 
 A **native macOS** menu-bar "island" HUD (Swift / AppKit + SwiftUI). It tails the Chat Hub

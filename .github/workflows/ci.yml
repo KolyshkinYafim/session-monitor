@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project builds with Xcode 26 (verified locally with 26.1.1). Pick the newest
+      # Xcode 26.x present on the runner image; fall back to the image default otherwise.
+      - name: Select Xcode
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          for v in 26.2 26.1.1 26.1 26.0.1 26.0; do
+            if [ -d "/Applications/Xcode_${v}.app" ]; then
+              sudo xcode-select -s "/Applications/Xcode_${v}.app"
+              break
+            fi
+          done
+          xcodebuild -version
+
+      - name: Build and test
+        run: |
+          xcodebuild \
+            -project SessionMonitor/SessionMonitor.xcodeproj \
+            -scheme SessionMonitor \
+            CODE_SIGNING_ALLOWED=NO \
+            build test

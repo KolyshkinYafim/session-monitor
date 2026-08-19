@@ -31,6 +31,14 @@
 		A10000000000000000000019 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* SettingsWindowController.swift */; };
 		A1000000000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* Assets.xcassets */; };
 		A1000000000000000000001A /* hooks in Resources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* hooks */; };
+		A20000000000000000000001 /* IslandGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* IslandGeometryTests.swift */; };
+		A20000000000000000000002 /* IslandUIStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* IslandUIStateTests.swift */; };
+		A20000000000000000000003 /* SessionModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* SessionModelsTests.swift */; };
+		A20000000000000000000004 /* SessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* SessionModels.swift */; };
+		A20000000000000000000005 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* Preferences.swift */; };
+		A20000000000000000000006 /* IslandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* IslandTheme.swift */; };
+		A20000000000000000000007 /* IslandGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* IslandGeometry.swift */; };
+		A20000000000000000000008 /* IslandUIState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* IslandUIState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,10 +69,21 @@
 		B10000000000000000000010 /* SessionMonitor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SessionMonitor.entitlements; sourceTree = "<group>"; };
 		B1000000000000000000001A /* hooks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = hooks; path = ../hooks; sourceTree = "<group>"; };
 		C10000000000000000000001 /* SessionMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SessionMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000001 /* IslandGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandGeometryTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* IslandUIStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandUIStateTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000003 /* SessionModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionModelsTests.swift; sourceTree = "<group>"; };
+		C20000000000000000000001 /* SessionMonitorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SessionMonitorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D10000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D20000000000000000000002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -78,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				E10000000000000000000002 /* SessionMonitor */,
+				E20000000000000000000001 /* SessionMonitorTests */,
 				B1000000000000000000001A /* hooks */,
 				E10000000000000000000003 /* Products */,
 			);
@@ -103,6 +123,7 @@
 			isa = PBXGroup;
 			children = (
 				C10000000000000000000001 /* SessionMonitor.app */,
+				C20000000000000000000001 /* SessionMonitorTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -147,6 +168,16 @@
 			path = UI;
 			sourceTree = "<group>";
 		};
+		E20000000000000000000001 /* SessionMonitorTests */ = {
+			isa = PBXGroup;
+			children = (
+				B20000000000000000000001 /* IslandGeometryTests.swift */,
+				B20000000000000000000002 /* IslandUIStateTests.swift */,
+				B20000000000000000000003 /* SessionModelsTests.swift */,
+			);
+			path = SessionMonitorTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -168,6 +199,22 @@
 			productReference = C10000000000000000000001 /* SessionMonitor.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F20000000000000000000001 /* SessionMonitorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F20000000000000000000004 /* Build configuration list for PBXNativeTarget "SessionMonitorTests" */;
+			buildPhases = (
+				F20000000000000000000002 /* Sources */,
+				D20000000000000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SessionMonitorTests;
+			productName = SessionMonitorTests;
+			productReference = C20000000000000000000001 /* SessionMonitorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -179,6 +226,9 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					F10000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					F20000000000000000000001 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -197,6 +247,7 @@
 			projectRoot = "";
 			targets = (
 				F10000000000000000000001 /* SessionMonitor */,
+				F20000000000000000000001 /* SessionMonitorTests */,
 			);
 		};
 /* End PBXProject section */
@@ -262,6 +313,21 @@
 				A1000000000000000000000D /* StatusItemController.swift in Sources */,
 				A10000000000000000000018 /* SettingsView.swift in Sources */,
 				A10000000000000000000019 /* SettingsWindowController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F20000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A20000000000000000000001 /* IslandGeometryTests.swift in Sources */,
+				A20000000000000000000002 /* IslandUIStateTests.swift in Sources */,
+				A20000000000000000000003 /* SessionModelsTests.swift in Sources */,
+				A20000000000000000000004 /* SessionModels.swift in Sources */,
+				A20000000000000000000005 /* Preferences.swift in Sources */,
+				A20000000000000000000006 /* IslandTheme.swift in Sources */,
+				A20000000000000000000007 /* IslandGeometry.swift in Sources */,
+				A20000000000000000000008 /* IslandUIState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,6 +417,38 @@
 			};
 			name = Release;
 		};
+		F20000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentdesktop.SessionMonitorTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F2000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.agentdesktop.SessionMonitorTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -359,6 +457,15 @@
 			buildConfigurations = (
 				F10000000000000000000009 /* Debug */,
 				F1000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F20000000000000000000004 /* Build configuration list for PBXNativeTarget "SessionMonitorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000009 /* Debug */,
+				F2000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
